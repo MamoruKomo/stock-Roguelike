@@ -1,8 +1,11 @@
 "use strict";
 
-const MAX_TURNS = 20;
+const MAX_STAGES = 5;
+const STAGE_TURNS = 3;
+const MAX_TURNS = MAX_STAGES * STAGE_TURNS;
 const INITIAL_CASH = 1000000;
 const MAX_CARDS_PER_TURN = 2;
+const TRANSACTION_FEE_RATE = 0.001;
 
 const STOCK_TEMPLATES = [
   { symbol: "TECH", name: "TechNova", type: "成長株", price: 10000, note: "上昇しやすいが下落も大きい" },
@@ -60,6 +63,92 @@ const MARKET_EVENTS = [
     changes: { TECH: -0.15, CARE: -0.15, GAME: -0.15, GREEN: -0.15 }
   }
 ];
+
+const STAGES = [
+  {
+    name: "決算の門番",
+    theme: "決算発表",
+    hp: 100000,
+    cashBonus: 50000,
+    marketMultiplier: 1,
+    bossName: "決算の門番"
+  },
+  {
+    name: "炎上インフルエンサー",
+    theme: "SNS相場",
+    hp: 180000,
+    cashBonus: 80000,
+    marketMultiplier: 1.1,
+    bossName: "炎上インフルエンサー"
+  },
+  {
+    name: "空売りファンド",
+    theme: "機関投資家",
+    hp: 280000,
+    cashBonus: 120000,
+    marketMultiplier: 1.2,
+    bossName: "空売りファンド"
+  },
+  {
+    name: "中央銀行",
+    theme: "金融引き締め",
+    hp: 400000,
+    cashBonus: 180000,
+    marketMultiplier: 1.35,
+    bossName: "中央銀行"
+  },
+  {
+    name: "ブラックマンデー",
+    theme: "市場暴落",
+    hp: 600000,
+    cashBonus: 0,
+    marketMultiplier: 1.5,
+    bossName: "ブラックマンデー"
+  }
+];
+
+const PASSIVE_DEFINITIONS = {
+  analysis: {
+    id: "analysis",
+    name: "分析力",
+    description: "次のボス予兆が少し具体的になる。"
+  },
+  feeCut: {
+    id: "feeCut",
+    name: "手数料削減",
+    description: "売買時の手数料を50%削減する。"
+  },
+  diversifiedInvestor: {
+    id: "diversifiedInvestor",
+    name: "分散投資家",
+    description: "3銘柄以上保有している場合、下落イベントの影響を20%軽減する。"
+  },
+  contrarian: {
+    id: "contrarian",
+    name: "逆張り投資家",
+    description: "前ターンに下落した銘柄を購入すると、購入量が10%増える。"
+  },
+  riskManagement: {
+    id: "riskManagement",
+    name: "リスク管理",
+    description: "ステージ中に一度だけ、最大損失を半分にする。"
+  },
+  infoNetwork: {
+    id: "infoNetwork",
+    name: "情報網",
+    description: "ボス対象銘柄が1ターン早くわかる。"
+  },
+  longTerm: {
+    id: "longTerm",
+    name: "長期投資家",
+    description: "同じ銘柄を2ターン以上保有している場合、その銘柄の評価額を少し上げる。"
+  },
+  gambler: {
+    id: "gambler",
+    name: "ギャンブラー",
+    description: "信用取引の利益と損失が2.5倍になる。"
+  }
+};
 
 const CARD_DEFINITIONS = {
   buy: {
@@ -351,6 +440,18 @@ const gameState = {
   gameOver: false,
   waitingForReward: false,
   turn: 1,
+  stageIndex: 0,
+  stageTurn: 1,
+  stageStartAssets: INITIAL_CASH,
+  lastTurnAssets: INITIAL_CASH,
+  bossHp: 0,
+  bossMaxHp: 0,
+  bossPlan: null,
+  currentOmen: "ゲーム開始後に表示されます。",
+  pendingReward: null,
+  selectedRewardCard: null,
+  selectedRewardPassive: null,
+  stageRiskUsed: false,
   cash: INITIAL_CASH,
   stocks: [],
   deck: [],
@@ -367,6 +468,7 @@ const gameState = {
     marketChoiceCharges: 0
   },
   relics: [],
+  passives: [],
   logs: []
 };
 
@@ -380,6 +482,16 @@ const elements = {
   stockValueText: document.getElementById("stockValueText"),
   totalAssetText: document.getElementById("totalAssetText"),
   playedCountText: document.getElementById("playedCountText"),
+  stageText: document.getElementById("stageText"),
+  stageTurnText: document.getElementById("stageTurnText"),
+  stageNameText: document.getElementById("stageNameText"),
+  bossNameText: document.getElementById("bossNameText"),
+  bossHpText: document.getElementById("bossHpText"),
+  bossHpFill: document.getElementById("bossHpFill"),
+  stageStartText: document.getElementById("stageStartText"),
+  stageProfitText: document.getElementById("stageProfitText"),
+  bossOmenText: document.getElementById("bossOmenText"),
+  passiveList: document.getElementById("passiveList"),
   stockTableBody: document.getElementById("stockTableBody"),
   tradeStockSelect: document.getElementById("tradeStockSelect"),
   tradeSharesInput: document.getElementById("tradeSharesInput"),
@@ -392,7 +504,11 @@ const elements = {
   logList: document.getElementById("logList"),
   effectBadges: document.getElementById("effectBadges"),
   rewardModal: document.getElementById("rewardModal"),
+  rewardTitle: document.getElementById("rewardTitle"),
+  rewardCashText: document.getElementById("rewardCashText"),
   rewardCards: document.getElementById("rewardCards"),
+  passiveRewards: document.getElementById("passiveRewards"),
+  confirmRewardButton: document.getElementById("confirmRewardButton"),
   resultModal: document.getElementById("resultModal"),
   resultLabel: document.getElementById("resultLabel"),
   resultTitle: document.getElementById("resultTitle"),
@@ -405,7 +521,8 @@ function createInitialStock(template) {
     price: template.price,
     previousPrice: template.price,
     shares: 0,
-    averageCost: 0
+    averageCost: 0,
+    holdingTurns: 0
   };
 }
 
@@ -422,6 +539,8 @@ function resetGame() {
   gameState.gameOver = false;
   gameState.waitingForReward = false;
   gameState.turn = 1;
+  gameState.stageIndex = 0;
+  gameState.stageTurn = 1;
   gameState.cash = INITIAL_CASH;
   gameState.stocks = STOCK_TEMPLATES.map(createInitialStock);
   gameState.deck = INITIAL_DECK.map(createCardInstance);
@@ -432,11 +551,16 @@ function resetGame() {
   gameState.nextDrawBonus = 0;
   gameState.effects = { margin: false, diversifyCharges: 0, crashGuards: 0, upsideBoostCharges: 0, marketChoiceCharges: 0 };
   gameState.relics = [];
+  gameState.passives = [];
+  gameState.pendingReward = null;
+  gameState.selectedRewardCard = null;
+  gameState.selectedRewardPassive = null;
   gameState.logs = [];
 
   elements.rewardModal.classList.add("hidden");
   elements.resultModal.classList.add("hidden");
-  addLog("ゲーム開始。初期資金100万円で20週間の投資を始めます。");
+  setupStage(0);
+  addLog("ゲーム開始。全5ステージの短期決戦を開始します。各ステージ3ターン以内にボスHPを削り切ってください。");
   startTurn();
 }
 
@@ -445,6 +569,7 @@ function startTurn() {
 
   gameState.playedThisTurn = 0;
   gameState.effects.margin = false;
+  prepareStageTurnOmen();
   if (hasRelic("riskMeter")) {
     gameState.effects.diversifyCharges += 1;
     addLog("レリック「リスク計量器」: このターンの下落半減を1回獲得。");
@@ -453,7 +578,7 @@ function startTurn() {
   const drawCount = 3 + gameState.nextDrawBonus + relicDrawBonus;
   gameState.nextDrawBonus = 0;
   drawCards(drawCount);
-  addLog(`<strong>Turn ${gameState.turn}</strong> 開始。手札を${drawCount}枚引きました。`);
+  addLog(`<strong>Stage ${gameState.stageIndex + 1}-${gameState.stageTurn}</strong> 開始。手札を${drawCount}枚引きました。`);
   render();
 }
 
@@ -501,24 +626,231 @@ function endTurn() {
   gameState.discardPile.push(...gameState.hand);
   gameState.hand = [];
   setPreviousPrices();
-  const event = selectMarketEvent();
-  addLog(`市場イベント: <strong>${event.name}</strong> - ${event.description}`);
-  applyPriceChanges(event.changes, event.name);
+  resolveStageTurnEvent();
 
   if (gameState.effects.margin) {
     resolveMarginRisk();
   }
 
+  updateHoldingTurns();
+  resolvePassiveEndOfTurnEffects();
   resolveEndOfTurnRelics();
 
   gameState.effects.margin = false;
+  resolveBossDamage();
   checkGameEnd();
   if (gameState.gameOver) {
     render();
     return;
   }
 
-  if (gameState.turn >= MAX_TURNS) {
+  if (gameState.bossHp <= 0) {
+    resolveStageEnd();
+    return;
+  }
+
+  if (gameState.stageTurn >= STAGE_TURNS) {
+    resolveStageEnd();
+    return;
+  }
+
+  gameState.stageTurn += 1;
+  gameState.turn += 1;
+  startTurn();
+}
+
+function setupStage(stageIndex) {
+  const stage = STAGES[stageIndex];
+  gameState.stageIndex = stageIndex;
+  gameState.stageTurn = 1;
+  gameState.stageStartAssets = calculateTotalAssets();
+  gameState.lastTurnAssets = gameState.stageStartAssets;
+  gameState.bossHp = stage.hp;
+  gameState.bossMaxHp = stage.hp;
+  gameState.bossPlan = createBossPlan(stageIndex);
+  gameState.currentOmen = createStageStartOmen();
+  gameState.stageRiskUsed = false;
+  addLog(`<strong>Stage ${stageIndex + 1}: ${stage.name}</strong> 開始。テーマ: ${stage.theme} / ボスHP ${formatYen(stage.hp)}。`);
+}
+
+function createBossPlan(stageIndex) {
+  if (stageIndex === 0) {
+    const target = randomItem(gameState.stocks).symbol;
+    const positive = Math.random() < 0.58;
+    return { target, positive, rebound: null };
+  }
+  if (stageIndex === 1) {
+    const target = randomItem(["TECH", "GAME"]);
+    const positive = Math.random() < 0.52;
+    return { target, positive, rebound: null };
+  }
+  if (stageIndex === 4) {
+    return { target: null, positive: false, rebound: randomItem(gameState.stocks).symbol };
+  }
+  return { target: null, positive: false, rebound: null };
+}
+
+function createStageStartOmen() {
+  const stage = getCurrentStage();
+  if (hasPassive("infoNetwork")) {
+    const target = getKnownBossTarget();
+    if (target) return `情報網: 次のボス対象は ${findStock(target).name}。Stage ${gameState.stageIndex + 1}「${stage.name}」への準備を。`;
+  }
+  return `Stage ${gameState.stageIndex + 1}「${stage.name}」開幕。テーマは「${stage.theme}」。`;
+}
+
+function prepareStageTurnOmen() {
+  if (gameState.stageTurn === 1) {
+    if (!hasPassive("infoNetwork")) {
+      gameState.currentOmen = createStageStartOmen();
+    }
+    return;
+  }
+
+  if (gameState.stageTurn === 2) {
+    gameState.currentOmen = createBossOmen();
+    addLog(`ボス予兆: ${gameState.currentOmen}`);
+    return;
+  }
+
+  gameState.currentOmen = `ボスターン。${getCurrentStage().bossName} のイベントがターン終了時に発生します。`;
+}
+
+function createBossOmen() {
+  const stageIndex = gameState.stageIndex;
+  const plan = gameState.bossPlan;
+  const precise = hasPassive("analysis");
+  if (stageIndex === 0) {
+    const stock = findStock(plan.target);
+    const mood = plan.positive ? "好調そう" : "不安がある";
+    return precise
+      ? `${stock.name} の決算が対象。資料には「${mood}」という強いサイン。`
+      : `${stock.name} に決算発表の気配。「${mood}」という市場の噂。`;
+  }
+  if (stageIndex === 1) {
+    const stock = findStock(plan.target);
+    const mood = plan.positive ? "熱狂的な拡散" : "炎上の火種";
+    return precise
+      ? `SNSトレンドは ${stock.name} に集中。内容は「${mood}」。`
+      : `TechNovaかGameForgeにSNS相場の気配。中心は ${stock.name} かもしれない。`;
+  }
+  if (stageIndex === 2) {
+    const currentTarget = getLargestHoldingSymbol();
+    return precise && currentTarget
+      ? `空売りファンドは現在の最大保有 ${findStock(currentTarget).name} を狙っている。3銘柄以上なら圧力は軽くなる。`
+      : "空売りファンドが集中ポジションを監視している。1銘柄集中は危険。";
+  }
+  if (stageIndex === 3) {
+    return precise
+      ? "中央銀行はTechNovaに強い下落圧力。CareLinkは比較的守りやすい。信用取引中の下落は重くなる。"
+      : "金融引き締めの予兆。成長株と信用取引に警戒。";
+  }
+  const rebound = findStock(plan.rebound);
+  return precise
+    ? `ブラックマンデーの後、${rebound.name} に大反発の買いが入りそう。`
+    : `全面暴落の予兆。ただし ${rebound.type} 周辺に反発資金が向かう気配。`;
+}
+
+function getKnownBossTarget() {
+  if (!gameState.bossPlan) return null;
+  if (gameState.stageIndex === 2) return getLargestHoldingSymbol();
+  if (gameState.stageIndex === 4) return gameState.bossPlan.rebound;
+  return gameState.bossPlan.target;
+}
+
+function resolveStageTurnEvent() {
+  if (gameState.stageTurn === 1) {
+    const event = selectMarketEvent();
+    addLog(`市場イベント: <strong>${event.name}</strong> - ${event.description}`);
+    applyPriceChanges(scaleChanges(event.changes, getCurrentStage().marketMultiplier), event.name);
+    resolveStagePressure();
+    return;
+  }
+
+  if (gameState.stageTurn === 2) {
+    addLog("予兆ターン終了。大きなボスイベントはまだ発生しません。ポジション調整の結果を評価します。");
+    resolveStagePressure();
+    return;
+  }
+
+  addLog(`ボスイベント: <strong>${getCurrentStage().bossName}</strong> が動きます。`);
+  resolveBossEvent();
+}
+
+function resolveStagePressure() {
+  if (gameState.stageIndex === 1 && gameState.stageTurn < STAGE_TURNS) {
+    const techMove = randomItem([-0.08, 0.08]);
+    const gameMove = randomItem([-0.10, 0.10]);
+    addLog("SNS相場のボラティリティ上昇: TechNovaとGameForgeが荒い値動き。");
+    applyPriceChanges({ TECH: techMove, GAME: gameMove }, "SNSボラティリティ");
+    return;
+  }
+
+  if (gameState.stageIndex !== 3) return;
+  const pressure = gameState.stageTurn === 1 ? -0.10 : -0.08;
+  addLog("中央銀行の継続圧力: TechNovaに金融引き締め売り。");
+  applyPriceChanges({ TECH: pressure }, "中央銀行の継続圧力");
+}
+
+function resolveBossEvent() {
+  const plan = gameState.bossPlan;
+  if (gameState.stageIndex === 0) {
+    const percent = plan.positive ? 0.25 : -0.20;
+    applyPriceChanges({ [plan.target]: percent }, "決算発表");
+    return;
+  }
+
+  if (gameState.stageIndex === 1) {
+    const percent = plan.positive ? 0.35 : -0.30;
+    applyPriceChanges({ [plan.target]: percent }, "SNS相場");
+    return;
+  }
+
+  if (gameState.stageIndex === 2) {
+    const target = getLargestHoldingSymbol() || randomItem(gameState.stocks).symbol;
+    const diversified = countHeldStocks() >= 3;
+    applyPriceChanges({ [target]: diversified ? -0.10 : -0.25 }, diversified ? "分散で軽減した空売り" : "空売りファンドの集中攻撃");
+    return;
+  }
+
+  if (gameState.stageIndex === 3) {
+    applyPriceChanges({ TECH: -0.25, GAME: -0.15, GREEN: -0.15, CARE: -0.05 }, "中央銀行ショック");
+    return;
+  }
+
+  applyPriceChanges({ TECH: -0.30, CARE: -0.30, GAME: -0.30, GREEN: -0.30 }, "ブラックマンデー暴落");
+  applyPriceChanges({ [plan.rebound]: 0.50 }, "暴落後の大反発");
+}
+
+function scaleChanges(changes, multiplier) {
+  return Object.fromEntries(
+    Object.entries(changes).map(([symbol, percent]) => [symbol, percent * multiplier])
+  );
+}
+
+function resolveBossDamage() {
+  const total = calculateTotalAssets();
+  const gain = total - gameState.lastTurnAssets;
+  const damage = Math.max(0, Math.floor(gain));
+  if (damage > 0) {
+    gameState.bossHp = Math.max(0, gameState.bossHp - damage);
+    addLog(`利益 ${formatYen(damage)} がボスへのダメージになりました。残HP ${formatYen(gameState.bossHp)}。`);
+  } else {
+    addLog("前ターン比の利益がないため、ボスへのダメージは0。");
+  }
+  gameState.lastTurnAssets = total;
+}
+
+function resolveStageEnd() {
+  if (gameState.bossHp > 0) {
+    gameState.gameOver = true;
+    showResult("Game Over", "ボス撃破失敗", `${getCurrentStage().bossName} のHPが ${formatYen(gameState.bossHp)} 残りました。最終資産: ${formatYen(calculateTotalAssets())}`);
+    render();
+    return;
+  }
+
+  addLog(`<strong>${getCurrentStage().bossName}</strong> を撃破。ステージクリア。`);
+  if (gameState.stageIndex >= MAX_STAGES - 1) {
     finishGame();
     render();
     return;
@@ -529,14 +861,26 @@ function endTurn() {
   render();
 }
 
-function chooseReward(cardId) {
-  const newCard = createCardInstance(cardId);
+function confirmStageReward() {
+  if (!gameState.pendingReward || !gameState.selectedRewardCard || !gameState.selectedRewardPassive) return;
+
+  const newCard = createCardInstance(gameState.selectedRewardCard);
   gameState.deck.push(newCard);
   gameState.discardPile.push(newCard);
+  if (!hasPassive(gameState.selectedRewardPassive)) {
+    gameState.passives.push(gameState.selectedRewardPassive);
+  }
+  gameState.cash += gameState.pendingReward.cashBonus;
+  addLog(`報酬: ${CARD_DEFINITIONS[gameState.selectedRewardCard].name} / ${PASSIVE_DEFINITIONS[gameState.selectedRewardPassive].name} / 現金 ${formatYen(gameState.pendingReward.cashBonus)} を獲得。`);
+
   gameState.waitingForReward = false;
+  gameState.pendingReward = null;
+  gameState.selectedRewardCard = null;
+  gameState.selectedRewardPassive = null;
   elements.rewardModal.classList.add("hidden");
+  gameState.stageIndex += 1;
   gameState.turn += 1;
-  addLog(`報酬カード <strong>${CARD_DEFINITIONS[cardId].name}</strong> をデッキに追加しました。`);
+  setupStage(gameState.stageIndex);
   startTurn();
 }
 
@@ -549,22 +893,31 @@ function buyStock(symbol, cashRatio) {
 
 function buyShares(symbol, sharesToBuy, source = "買付") {
   const stock = findStock(symbol);
+  let bonusShares = 0;
+  if (hasPassive("contrarian") && stock.price < stock.previousPrice) {
+    bonusShares = Math.max(1, Math.floor(sharesToBuy * 0.1));
+    addLog(`逆張り投資家: 下落銘柄の買付量が${bonusShares}株増加。`);
+  }
+
   if (sharesToBuy <= 0) {
     addLog(`${stock.name}を購入する現金が不足しています。`);
     return false;
   }
 
-  const cost = sharesToBuy * stock.price;
+  const subtotal = sharesToBuy * stock.price;
+  const fee = calculateTradeFee(subtotal);
+  const cost = subtotal + fee;
   if (cost > gameState.cash) {
     addLog(`${stock.name}を${sharesToBuy}株購入する現金が不足しています。`);
     return false;
   }
 
+  const totalShares = sharesToBuy + bonusShares;
   const currentCost = stock.averageCost * stock.shares;
-  stock.averageCost = (currentCost + cost) / (stock.shares + sharesToBuy);
-  stock.shares += sharesToBuy;
+  stock.averageCost = (currentCost + subtotal) / (stock.shares + totalShares);
+  stock.shares += totalShares;
   gameState.cash -= cost;
-  addLog(`${source}: ${stock.name}を${sharesToBuy}株購入。約定代金 ${formatYen(cost)}。`);
+  addLog(`${source}: ${stock.name}を${totalShares}株購入。約定代金 ${formatYen(subtotal)} / 手数料 ${formatYen(fee)}。`);
   return true;
 }
 
@@ -586,12 +939,27 @@ function sellShares(symbol, sharesToSell, source = "売却") {
     return false;
   }
 
-  const revenue = sharesToSell * stock.price;
+  const subtotal = sharesToSell * stock.price;
+  const fee = calculateTradeFee(subtotal);
+  const revenue = subtotal - fee;
   stock.shares -= sharesToSell;
-  if (stock.shares === 0) stock.averageCost = 0;
+  if (stock.shares === 0) {
+    stock.averageCost = 0;
+    stock.holdingTurns = 0;
+  }
   gameState.cash += revenue;
-  addLog(`${source}: ${stock.name}を${sharesToSell}株売却。受取 ${formatYen(revenue)}。`);
+  addLog(`${source}: ${stock.name}を${sharesToSell}株売却。受取 ${formatYen(revenue)} / 手数料 ${formatYen(fee)}。`);
   return true;
+}
+
+function calculateTradeFee(amount) {
+  const rate = hasPassive("feeCut") ? TRANSACTION_FEE_RATE / 2 : TRANSACTION_FEE_RATE;
+  return Math.ceil(amount * rate);
+}
+
+function calculateMaxBuyShares(price) {
+  const rate = hasPassive("feeCut") ? TRANSACTION_FEE_RATE / 2 : TRANSACTION_FEE_RATE;
+  return Math.floor(gameState.cash / (price * (1 + rate)));
 }
 
 function improveAverageCost(symbol, improvementRate) {
@@ -625,13 +993,19 @@ function applyPriceChanges(changes, source) {
 
   Object.entries(adjustedChanges).forEach(([symbol, percent]) => {
     const stock = findStock(symbol);
-    const leverage = gameState.effects.margin && stock.shares > 0 ? 2 : 1;
+    const leverage = gameState.effects.margin && stock.shares > 0 ? getMarginMultiplier(percent) : 1;
     const leveragedPercent = percent * leverage;
     const oldPrice = stock.price;
     stock.price = Math.max(100, Math.round(stock.price * (1 + leveragedPercent)));
     const sign = leveragedPercent >= 0 ? "+" : "";
     addLog(`${stock.name}: ${formatYen(oldPrice)} → ${formatYen(stock.price)} (${sign}${formatPercent(leveragedPercent)})`);
   });
+}
+
+function getMarginMultiplier(percent) {
+  if (hasPassive("gambler")) return 2.5;
+  if (gameState.stageIndex === 3 && percent < 0) return 3;
+  return 2;
 }
 
 function adjustUpside(changes, source) {
@@ -660,9 +1034,27 @@ function adjustDownside(changes, source) {
   if (gameState.effects.diversifyCharges > 0) {
     gameState.effects.diversifyCharges -= 1;
     addLog(`分散投資が発動。${source} の下落幅を半分にしました。`);
-    return Object.fromEntries(
+    changes = Object.fromEntries(
       Object.entries(changes).map(([symbol, percent]) => [symbol, percent < 0 ? percent / 2 : percent])
     );
+  }
+
+  if (hasPassive("diversifiedInvestor") && countHeldStocks() >= 3) {
+    addLog(`分散投資家: 3銘柄以上保有により、${source} の下落影響を20%軽減。`);
+    changes = Object.fromEntries(
+      Object.entries(changes).map(([symbol, percent]) => [symbol, percent < 0 ? percent * 0.8 : percent])
+    );
+  }
+
+  if (hasPassive("riskManagement") && !gameState.stageRiskUsed) {
+    const downsideEntries = Object.entries(changes).filter(([, percent]) => percent < 0);
+    if (downsideEntries.length > 0) {
+      downsideEntries.sort((a, b) => a[1] - b[1]);
+      const [worstSymbol] = downsideEntries[0];
+      gameState.stageRiskUsed = true;
+      addLog(`リスク管理: ${findStock(worstSymbol).name} の最大損失を半分にしました。`);
+      changes = { ...changes, [worstSymbol]: changes[worstSymbol] / 2 };
+    }
   }
 
   return changes;
@@ -750,6 +1142,49 @@ function hasRelic(relicId) {
   return gameState.relics.includes(relicId);
 }
 
+function hasPassive(passiveId) {
+  return gameState.passives.includes(passiveId);
+}
+
+function getCurrentStage() {
+  return STAGES[gameState.stageIndex] || STAGES[0];
+}
+
+function countHeldStocks() {
+  return gameState.stocks.filter((stock) => stock.shares > 0).length;
+}
+
+function getLargestHoldingSymbol() {
+  const holdings = gameState.stocks.filter((stock) => stock.shares > 0);
+  if (holdings.length === 0) return null;
+  holdings.sort((a, b) => (b.shares * b.price) - (a.shares * a.price));
+  return holdings[0].symbol;
+}
+
+function updateHoldingTurns() {
+  gameState.stocks.forEach((stock) => {
+    if (stock.shares > 0) {
+      stock.holdingTurns += 1;
+    } else {
+      stock.holdingTurns = 0;
+    }
+  });
+}
+
+function resolvePassiveEndOfTurnEffects() {
+  if (!hasPassive("longTerm")) return;
+
+  const changes = {};
+  gameState.stocks.forEach((stock) => {
+    if (stock.shares > 0 && stock.holdingTurns >= 2) {
+      changes[stock.symbol] = 0.03;
+    }
+  });
+  if (Object.keys(changes).length === 0) return;
+  addLog("長期投資家: 2ターン以上保有している銘柄に評価見直し。");
+  applyPriceChanges(changes, "長期投資家");
+}
+
 function resolveEndOfTurnRelics() {
   if (!hasRelic("compoundSeed")) return;
 
@@ -782,14 +1217,34 @@ function removeCardInstanceFromDeck(instanceId) {
 
 function showRewards() {
   const rewards = drawRewardChoices();
+  const passiveChoices = drawPassiveChoices();
+  const cashBonus = getCurrentStage().cashBonus;
+  gameState.pendingReward = { rewards, passiveChoices, cashBonus };
+  gameState.selectedRewardCard = null;
+  gameState.selectedRewardPassive = null;
+  elements.rewardTitle.textContent = `Stage ${gameState.stageIndex + 1} Clear Reward`;
+  elements.rewardCashText.textContent = `現金ボーナス: ${formatYen(cashBonus)}`;
   elements.rewardCards.innerHTML = "";
   rewards.forEach((cardId) => {
     const cardElement = createCardElement(CARD_DEFINITIONS[cardId], {
       reward: true,
-      onClick: () => chooseReward(cardId)
+      onClick: () => selectRewardCard(cardId)
     });
+    cardElement.dataset.cardId = cardId;
     elements.rewardCards.appendChild(cardElement);
   });
+
+  elements.passiveRewards.innerHTML = "";
+  passiveChoices.forEach((passiveId) => {
+    const passive = PASSIVE_DEFINITIONS[passiveId];
+    const button = document.createElement("button");
+    button.className = "passive-option";
+    button.dataset.passiveId = passiveId;
+    button.innerHTML = `<strong>${passive.name}</strong><span>${passive.description}</span>`;
+    button.addEventListener("click", () => selectRewardPassive(passiveId));
+    elements.passiveRewards.appendChild(button);
+  });
+  updateRewardConfirmState();
   elements.rewardModal.classList.remove("hidden");
 }
 
@@ -797,11 +1252,38 @@ function drawRewardChoices() {
   const choices = new Set();
   while (choices.size < 3) {
     const roll = Math.random();
-    const rarity = roll < 0.68 ? "Common" : roll < 0.92 ? "Rare" : "Epic";
+    const epicRate = 0.08 + gameState.stageIndex * 0.035;
+    const rareRate = 0.24 + gameState.stageIndex * 0.04;
+    const rarity = roll < 1 - rareRate - epicRate ? "Common" : roll < 1 - epicRate ? "Rare" : "Epic";
     const candidates = REWARD_POOL.filter((cardId) => CARD_DEFINITIONS[cardId].rarity === rarity);
     choices.add(randomItem(candidates));
   }
   return [...choices];
+}
+
+function drawPassiveChoices() {
+  const available = Object.keys(PASSIVE_DEFINITIONS).filter((passiveId) => !hasPassive(passiveId));
+  return shuffle(available).slice(0, 3);
+}
+
+function selectRewardCard(cardId) {
+  gameState.selectedRewardCard = cardId;
+  [...elements.rewardCards.children].forEach((cardElement) => {
+    cardElement.classList.toggle("selected", cardElement.dataset.cardId === cardId);
+  });
+  updateRewardConfirmState();
+}
+
+function selectRewardPassive(passiveId) {
+  gameState.selectedRewardPassive = passiveId;
+  [...elements.passiveRewards.children].forEach((button) => {
+    button.classList.toggle("selected", button.dataset.passiveId === passiveId);
+  });
+  updateRewardConfirmState();
+}
+
+function updateRewardConfirmState() {
+  elements.confirmRewardButton.disabled = !gameState.selectedRewardCard || !gameState.selectedRewardPassive;
 }
 
 function canUseCard(card, target) {
@@ -842,7 +1324,7 @@ function finishGame() {
   const total = calculateTotalAssets();
   const multiple = total / INITIAL_CASH;
   const rank = multiple >= 3 ? "S" : multiple >= 2 ? "A" : multiple >= 1.4 ? "B" : multiple >= 1 ? "C" : "D";
-  showResult("Final Score", "20ターン終了", `最終資産は ${formatYen(total)}。初期資産比 ${multiple.toFixed(2)} 倍、投資ランク ${rank} です。`);
+  showResult("Game Clear", "全5ステージ制覇", `ブラックマンデーを突破しました。最終資産は ${formatYen(total)}。初期資産比 ${multiple.toFixed(2)} 倍、投資ランク ${rank} です。`);
 }
 
 function showResult(label, title, message) {
@@ -867,6 +1349,8 @@ function findStock(symbol) {
 function addLog(message) {
   gameState.logs.unshift({
     turn: gameState.turn,
+    stage: gameState.stageIndex + 1,
+    stageTurn: gameState.stageTurn,
     message
   });
   gameState.logs = gameState.logs.slice(0, 80);
@@ -897,13 +1381,14 @@ function fillMaxShares(type) {
   const stock = findStock(elements.tradeStockSelect.value);
   if (!stock) return;
 
-  const maxShares = type === "buy" ? Math.floor(gameState.cash / stock.price) : stock.shares;
+  const maxShares = type === "buy" ? calculateMaxBuyShares(stock.price) : stock.shares;
   elements.tradeSharesInput.value = Math.max(0, maxShares);
   renderTradePanel();
 }
 
 function render() {
   renderStatus();
+  renderStageInfo();
   renderStocks();
   renderTradePanel();
   renderHand();
@@ -915,10 +1400,39 @@ function render() {
 
 function renderStatus() {
   elements.turnText.textContent = gameState.started ? `${gameState.turn} / ${MAX_TURNS}` : "-";
+  elements.stageText.textContent = gameState.started ? `${gameState.stageIndex + 1} / ${MAX_STAGES}` : "-";
+  elements.stageTurnText.textContent = gameState.started ? `${gameState.stageTurn} / ${STAGE_TURNS}` : "-";
   elements.cashText.textContent = formatYen(gameState.cash);
   elements.stockValueText.textContent = formatYen(calculateStockValue());
   elements.totalAssetText.textContent = formatYen(calculateTotalAssets());
   elements.playedCountText.textContent = `使用済み ${gameState.playedThisTurn} / ${MAX_CARDS_PER_TURN}`;
+}
+
+function renderStageInfo() {
+  const stage = getCurrentStage();
+  const profit = calculateTotalAssets() - gameState.stageStartAssets;
+  const hpRatio = gameState.bossMaxHp > 0 ? Math.max(0, gameState.bossHp / gameState.bossMaxHp) : 0;
+
+  elements.stageNameText.textContent = gameState.started ? `${stage.name} / ${stage.theme}` : "-";
+  elements.bossNameText.textContent = gameState.started ? stage.bossName : "-";
+  elements.bossHpText.textContent = gameState.started ? `${formatYen(gameState.bossHp)} / ${formatYen(gameState.bossMaxHp)}` : "-";
+  elements.bossHpFill.style.width = `${hpRatio * 100}%`;
+  elements.stageStartText.textContent = gameState.started ? formatYen(gameState.stageStartAssets) : "-";
+  elements.stageProfitText.textContent = gameState.started ? formatYen(profit) : "-";
+  elements.stageProfitText.className = profit >= 0 ? "positive" : "negative";
+  elements.bossOmenText.textContent = gameState.currentOmen || "-";
+  elements.passiveList.innerHTML = renderPassiveList();
+}
+
+function renderPassiveList() {
+  const passiveNames = gameState.passives.map((passiveId) => PASSIVE_DEFINITIONS[passiveId].name);
+  const relicNames = gameState.relics
+    .map((relicId) => RELIC_DEFINITIONS.find((relic) => relic.id === relicId))
+    .filter(Boolean)
+    .map((relic) => relic.name);
+  const names = [...passiveNames, ...relicNames];
+  if (names.length === 0) return `<span class="empty-inline">なし</span>`;
+  return names.map((name) => `<span class="passive-chip">${name}</span>`).join("");
 }
 
 function renderStocks() {
@@ -959,7 +1473,7 @@ function renderTradePanel() {
   if (selectedSymbol) elements.tradeStockSelect.value = selectedSymbol;
   const stock = findStock(elements.tradeStockSelect.value);
   const disabled = !gameState.started || gameState.gameOver || !stock;
-  const maxBuy = stock ? Math.floor(gameState.cash / stock.price) : 0;
+  const maxBuy = stock ? calculateMaxBuyShares(stock.price) : 0;
   const maxSell = stock ? stock.shares : 0;
 
   elements.buySharesButton.disabled = disabled || maxBuy <= 0;
@@ -1036,7 +1550,7 @@ function createCardElement(card, options) {
   }
 
   const button = document.createElement("button");
-  button.textContent = options.reward ? "デッキに追加" : "使用";
+  button.textContent = options.reward ? "カードを選択" : "使用";
   button.disabled = disabled;
   button.addEventListener("click", () => {
     if (options.reward) {
@@ -1062,7 +1576,7 @@ function renderLogs() {
   gameState.logs.forEach((log) => {
     const item = document.createElement("div");
     item.className = "log-item";
-    item.innerHTML = `<strong>T${log.turn}</strong> ${log.message}`;
+    item.innerHTML = `<strong>S${log.stage}-${log.stageTurn}</strong> ${log.message}`;
     elements.logList.appendChild(item);
   });
 }
@@ -1079,6 +1593,7 @@ function renderEffects() {
     { label: `暴落耐性 ${gameState.effects.crashGuards}`, active: gameState.effects.crashGuards > 0 },
     { label: `倍率 ${gameState.effects.upsideBoostCharges}`, active: gameState.effects.upsideBoostCharges > 0 },
     { label: `分岐 ${gameState.effects.marketChoiceCharges}`, active: gameState.effects.marketChoiceCharges > 0 },
+    { label: `パッシブ ${gameState.passives.length}`, active: gameState.passives.length > 0 },
     { label: `レリック ${gameState.relics.length}${relicNames ? `: ${relicNames}` : ""}`, active: gameState.relics.length > 0 },
     { label: `山札 ${gameState.drawPile.length}`, active: false },
     { label: `捨札 ${gameState.discardPile.length}`, active: false },
@@ -1121,6 +1636,7 @@ elements.startButton.addEventListener("click", resetGame);
 elements.restartButton.addEventListener("click", resetGame);
 elements.resultRestartButton.addEventListener("click", resetGame);
 elements.endTurnButton.addEventListener("click", endTurn);
+elements.confirmRewardButton.addEventListener("click", confirmStageReward);
 elements.buySharesButton.addEventListener("click", () => executeManualTrade("buy"));
 elements.sellSharesButton.addEventListener("click", () => executeManualTrade("sell"));
 elements.maxBuyButton.addEventListener("click", () => fillMaxShares("buy"));

@@ -21,7 +21,15 @@
 
     <section id="statusPanel" class="status-grid">
       <div class="metric">
-        <span>ターン</span>
+        <span>ステージ</span>
+        <strong id="stageText">-</strong>
+      </div>
+      <div class="metric">
+        <span>ステージ内ターン</span>
+        <strong id="stageTurnText">-</strong>
+      </div>
+      <div class="metric">
+        <span>総ターン</span>
         <strong id="turnText">-</strong>
       </div>
       <div class="metric">
@@ -35,6 +43,46 @@
       <div class="metric total">
         <span>総資産</span>
         <strong id="totalAssetText">-</strong>
+      </div>
+    </section>
+
+    <section class="stage-panel panel">
+      <div class="panel-header">
+        <div>
+          <p class="eyebrow">Boss Battle</p>
+          <h2 id="stageNameText">-</h2>
+        </div>
+        <div class="boss-name">
+          <span>ボス</span>
+          <strong id="bossNameText">-</strong>
+        </div>
+      </div>
+      <div class="stage-grid">
+        <div class="boss-hp-block">
+          <div class="boss-hp-row">
+            <span>Boss HP</span>
+            <strong id="bossHpText">-</strong>
+          </div>
+          <div class="boss-hp-bar">
+            <div id="bossHpFill" class="boss-hp-fill"></div>
+          </div>
+        </div>
+        <div class="stage-stat">
+          <span>ステージ開始時総資産</span>
+          <strong id="stageStartText">-</strong>
+        </div>
+        <div class="stage-stat">
+          <span>現在のステージ利益</span>
+          <strong id="stageProfitText">-</strong>
+        </div>
+        <div class="omen-box">
+          <span>次のボス予兆</span>
+          <strong id="bossOmenText">ゲーム開始後に表示されます。</strong>
+        </div>
+        <div class="passive-box">
+          <span>所持パッシブ</span>
+          <div id="passiveList" class="passive-list"></div>
+        </div>
       </div>
     </section>
 
@@ -117,8 +165,13 @@
   <div id="rewardModal" class="modal hidden">
     <div class="modal-card">
       <p class="eyebrow">Deck Builder</p>
-      <h2>デッキに追加するカードを選択</h2>
+      <h2 id="rewardTitle">ステージクリア報酬</h2>
+      <p id="rewardCashText" class="reward-cash">現金ボーナス: -</p>
+      <h3 class="reward-heading">カード報酬</h3>
       <div id="rewardCards" class="reward-grid"></div>
+      <h3 class="reward-heading">パッシブスキル</h3>
+      <div id="passiveRewards" class="passive-reward-grid"></div>
+      <button id="confirmRewardButton" class="primary-button reward-confirm" disabled>報酬を受け取って次のステージへ</button>
     </div>
   </div>
 
