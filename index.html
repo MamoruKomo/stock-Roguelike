@@ -3,15 +3,15 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Stock Roguelike</title>
+  <title>Market Dungeon</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <div class="app-shell">
     <header class="topbar">
       <div>
-        <p class="eyebrow">Stock Roguelike</p>
-        <h1>TechNova ワンティッカー・ローグライク</h1>
+        <p class="eyebrow">Market Dungeon</p>
+        <h1>マーケットダンジョン</h1>
       </div>
       <div class="top-actions">
         <button id="startButton" class="primary-button">ゲーム開始</button>
@@ -37,7 +37,7 @@
         <strong id="cashText">-</strong>
       </div>
       <div class="metric">
-        <span>保有株評価額</span>
+        <span>ポジション評価額</span>
         <strong id="stockValueText">-</strong>
       </div>
       <div class="metric total">
@@ -97,25 +97,47 @@
       <section class="market-panel panel">
         <div class="panel-header">
           <div>
-            <p class="eyebrow">Market Board</p>
-            <h2>TechNova 取引盤</h2>
+            <p class="eyebrow">Market Screen</p>
+            <h2>価格チャート</h2>
           </div>
           <div id="effectBadges" class="effect-badges"></div>
         </div>
 
-        <table class="stock-table">
-          <thead>
-            <tr>
-              <th>銘柄</th>
-              <th>株価</th>
-              <th>前ターン比</th>
-              <th>過熱</th>
-              <th>保有株数</th>
-              <th>評価額</th>
-            </tr>
-          </thead>
-          <tbody id="stockTableBody"></tbody>
-        </table>
+        <div class="chart-screen">
+          <div class="price-strip">
+            <div class="price-main">
+              <span>現在価格</span>
+              <strong id="marketPriceText">-</strong>
+            </div>
+            <div class="price-chip">
+              <span>前ターン比</span>
+              <strong id="marketChangeText">-</strong>
+            </div>
+            <div class="price-chip">
+              <span>過熱</span>
+              <strong id="marketHeatText">-</strong>
+            </div>
+          </div>
+          <div id="priceChart" class="price-chart"></div>
+          <div class="position-grid">
+            <div>
+              <span>保有口数</span>
+              <strong id="positionSharesText">-</strong>
+            </div>
+            <div>
+              <span>評価額</span>
+              <strong id="positionValueText">-</strong>
+            </div>
+            <div>
+              <span>平均取得</span>
+              <strong id="averageCostText">-</strong>
+            </div>
+            <div>
+              <span>評価損益</span>
+              <strong id="unrealizedProfitText">-</strong>
+            </div>
+          </div>
+        </div>
       </section>
 
       <section class="trade-panel panel">
@@ -127,12 +149,12 @@
         </div>
         <div class="trade-form">
           <label class="stock-select-field">
-            <span>銘柄</span>
+            <span>市場</span>
             <select id="tradeStockSelect"></select>
           </label>
           <label>
-            <span>株数</span>
-            <input id="tradeSharesInput" type="number" min="1" step="1" placeholder="株数を入力">
+            <span>口数</span>
+            <input id="tradeSharesInput" type="number" min="1" step="1" placeholder="口数を入力">
           </label>
           <div class="trade-buttons">
             <button id="maxBuyButton" class="ghost-button">買付上限</button>
@@ -140,7 +162,7 @@
             <button id="buySharesButton" class="buy-button">買付</button>
             <button id="sellSharesButton" class="sell-button">売却</button>
           </div>
-          <p id="tradeHint" class="trade-hint">ゲーム開始後、株数を指定していつでも売買できます。</p>
+          <p id="tradeHint" class="trade-hint">ゲーム開始後、口数を指定していつでも売買できます。</p>
         </div>
       </section>
 
@@ -164,6 +186,10 @@
             <span id="playedCountText">使用済み 0 / 2</span>
             <button id="endTurnButton" class="primary-button">ターン終了</button>
           </div>
+        </div>
+        <div class="deck-panel-inline">
+          <div class="deck-summary" id="deckSummary">Deck -</div>
+          <div id="deckList" class="deck-list"></div>
         </div>
         <div id="handCards" class="card-grid"></div>
       </section>

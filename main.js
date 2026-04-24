@@ -1,14 +1,14 @@
 "use strict";
 
 const MAX_STAGES = 5;
-const STAGE_TURNS = 3;
+const STAGE_TURNS = 4;
 const MAX_TURNS = MAX_STAGES * STAGE_TURNS;
 const INITIAL_CASH = 1000000;
 const MAX_CARDS_PER_TURN = 2;
 const TRANSACTION_FEE_RATE = 0.001;
 
 const STOCK_TEMPLATES = [
-  { symbol: "TECH", name: "TechNova", type: "成長株", price: 10000, note: "唯一の取引対象。ボス予兆を読んで売買する" }
+  { symbol: "TECH", name: "市場価格", type: "マーケット", price: 10000, note: "ボス予兆を読んで売買する" }
 ];
 
 const STOCK_ICONS = {
@@ -18,42 +18,42 @@ const STOCK_ICONS = {
 const MARKET_EVENTS = [
   {
     name: "地合い改善",
-    description: "TechNova +10%",
+    description: "市場価格 +10%",
     changes: { TECH: 0.10 }
   },
   {
     name: "地合い悪化",
-    description: "TechNova -10%",
+    description: "市場価格 -10%",
     changes: { TECH: -0.10 }
   },
   {
     name: "AIブーム",
-    description: "TechNova +20%",
+    description: "市場価格 +20%",
     changes: { TECH: 0.20 }
   },
   {
     name: "大型契約観測",
-    description: "TechNova +18%",
+    description: "市場価格 +18%",
     changes: { TECH: 0.18 }
   },
   {
     name: "製品延期",
-    description: "TechNova -22%",
+    description: "市場価格 -22%",
     changes: { TECH: -0.22 }
   },
   {
     name: "補助金採択",
-    description: "TechNova +25%",
+    description: "市場価格 +25%",
     changes: { TECH: 0.25 }
   },
   {
     name: "円安追い風",
-    description: "TechNova +10%",
+    description: "市場価格 +10%",
     changes: { TECH: 0.10 }
   },
   {
     name: "景気後退",
-    description: "TechNova -15%",
+    description: "市場価格 -15%",
     changes: { TECH: -0.15 }
   }
 ];
@@ -120,7 +120,7 @@ const PASSIVE_DEFINITIONS = {
   contrarian: {
     id: "contrarian",
     name: "逆張り投資家",
-    description: "前ターンに下落した銘柄を購入すると、購入量が10%増える。"
+    description: "前ターンに下落した価格を購入すると、購入量が10%増える。"
   },
   riskManagement: {
     id: "riskManagement",
@@ -135,7 +135,7 @@ const PASSIVE_DEFINITIONS = {
   longTerm: {
     id: "longTerm",
     name: "長期投資家",
-    description: "同じ銘柄を2ターン以上保有している場合、その銘柄の評価額を少し上げる。"
+    description: "2ターン以上保有している場合、評価額を少し上げる。"
   },
   gambler: {
     id: "gambler",
@@ -150,7 +150,7 @@ const CARD_DEFINITIONS = {
     name: "押し目買いシグナル",
     rarity: "Common",
     category: "投資支援",
-    description: "指定銘柄を一時的に5%下落させる。常時売買で買い場を作るカード。",
+    description: "市場価格を一時的に5%下落させる。常時売買で買い場を作るカード。",
     target: "all",
     use(target) {
       applyPriceChanges({ [target]: -0.05 }, "押し目買いシグナル");
@@ -161,7 +161,7 @@ const CARD_DEFINITIONS = {
     name: "利確ブースト",
     rarity: "Common",
     category: "投資支援",
-    description: "保有している指定銘柄を8%上昇させる。売却判断は常時売買で行う。",
+    description: "保有中なら市場価格を8%上昇させる。売却判断は常時売買で行う。",
     target: "owned",
     use(target) {
       applyPriceChanges({ [target]: 0.08 }, "利確ブースト");
@@ -172,7 +172,7 @@ const CARD_DEFINITIONS = {
     name: "ナンピン",
     rarity: "Common",
     category: "投資支援",
-    description: "前ターンより下落している保有銘柄の平均取得価格を10%改善する。",
+    description: "前ターンより下落している時、平均取得価格を10%改善する。",
     target: "dipped",
     use(target) {
       improveAverageCost(target, 0.10);
@@ -196,11 +196,11 @@ const CARD_DEFINITIONS = {
     name: "信用取引",
     rarity: "Rare",
     category: "投資行動",
-    description: "このターン中、保有銘柄の利益と損失が2倍。終了時に追証リスクがある。",
+    description: "このターン中、保有ポジションの利益と損失が2倍。終了時に追証リスクがある。",
     target: "none",
     use() {
       gameState.effects.margin = true;
-      addLog("信用取引を開始。保有銘柄の値動きがこのターンだけ2倍になります。");
+      addLog("信用取引を開始。保有ポジションの値動きがこのターンだけ2倍になります。");
     }
   },
   goodEarnings: {
@@ -208,7 +208,7 @@ const CARD_DEFINITIONS = {
     name: "好決算",
     rarity: "Common",
     category: "ニュース",
-    description: "指定銘柄の株価を20%上昇させる。",
+    description: "市場価格を20%上昇させる。",
     target: "all",
     use(target) {
       applyPriceChanges({ [target]: 0.20 }, "好決算");
@@ -219,7 +219,7 @@ const CARD_DEFINITIONS = {
     name: "悪決算",
     rarity: "Common",
     category: "ニュース",
-    description: "指定銘柄の株価を20%下落させる。",
+    description: "市場価格を20%下落させる。",
     target: "all",
     use(target) {
       applyPriceChanges({ [target]: -0.20 }, "悪決算");
@@ -230,7 +230,7 @@ const CARD_DEFINITIONS = {
     name: "SNS炎上",
     rarity: "Rare",
     category: "ニュース",
-    description: "TechNovaの株価を30%下落させる。",
+    description: "市場価格を30%下落させる。",
     target: "all",
     use(target) {
       applyPriceChanges({ [target]: -0.30 }, "SNS炎上");
@@ -241,7 +241,7 @@ const CARD_DEFINITIONS = {
     name: "国策テーマ化",
     rarity: "Rare",
     category: "ニュース",
-    description: "TechNovaの株価を30%上昇させる。",
+    description: "市場価格を30%上昇させる。",
     target: "all",
     use(target) {
       applyPriceChanges({ [target]: 0.30 }, "国策テーマ化");
@@ -252,7 +252,7 @@ const CARD_DEFINITIONS = {
     name: "金利上昇",
     rarity: "Rare",
     category: "ニュース",
-    description: "成長株であるTechNovaの株価を25%下落させる。",
+    description: "高PER不安で市場価格を25%下落させる。",
     target: "none",
     use() {
       applyPriceChanges({ TECH: -0.25 }, "金利上昇");
@@ -288,7 +288,7 @@ const CARD_DEFINITIONS = {
     name: "暴落耐性",
     rarity: "Rare",
     category: "防御",
-    description: "次の株価下落を1回だけ無効化する。",
+    description: "次の価格下落を1回だけ無効化する。",
     target: "none",
     use() {
       gameState.effects.crashGuards += 1;
@@ -300,7 +300,7 @@ const CARD_DEFINITIONS = {
     name: "仕手筋の噂",
     rarity: "Rare",
     category: "ニュース",
-    description: "指定銘柄を12%上昇させ、次の上昇イベント倍率をさらに高める。",
+    description: "市場価格を12%上昇させ、次の上昇イベント倍率をさらに高める。",
     target: "all",
     use(target) {
       applyPriceChanges({ [target]: 0.12 }, "仕手筋の噂");
@@ -312,7 +312,7 @@ const CARD_DEFINITIONS = {
     name: "サプライズ決算",
     rarity: "Epic",
     category: "ニュース",
-    description: "指定銘柄の株価を40%上昇させる。",
+    description: "市場価格を40%上昇させる。",
     target: "all",
     use(target) {
       applyPriceChanges({ [target]: 0.40 }, "サプライズ決算");
@@ -336,7 +336,7 @@ const CARD_DEFINITIONS = {
     name: "運命のダイス",
     rarity: "Common",
     category: "運試し",
-    description: "指定銘柄にランダムな値動き。-15%、+10%、+25%のどれかが出る。",
+    description: "市場価格にランダムな値動き。-15%、+10%、+25%のどれかが出る。",
     target: "all",
     use(target) {
       const outcomes = [-0.15, 0.10, 0.25];
@@ -447,6 +447,7 @@ const gameState = {
   bossMaxHp: 0,
   bossPlan: null,
   currentOmen: "ゲーム開始後に表示されます。",
+  priceHistory: [],
   pendingReward: null,
   selectedRewardCard: null,
   selectedRewardPassive: null,
@@ -493,7 +494,14 @@ const elements = {
   comboText: document.getElementById("comboText"),
   bossOmenText: document.getElementById("bossOmenText"),
   passiveList: document.getElementById("passiveList"),
-  stockTableBody: document.getElementById("stockTableBody"),
+  marketPriceText: document.getElementById("marketPriceText"),
+  marketChangeText: document.getElementById("marketChangeText"),
+  marketHeatText: document.getElementById("marketHeatText"),
+  priceChart: document.getElementById("priceChart"),
+  positionSharesText: document.getElementById("positionSharesText"),
+  positionValueText: document.getElementById("positionValueText"),
+  averageCostText: document.getElementById("averageCostText"),
+  unrealizedProfitText: document.getElementById("unrealizedProfitText"),
   tradeStockSelect: document.getElementById("tradeStockSelect"),
   tradeSharesInput: document.getElementById("tradeSharesInput"),
   buySharesButton: document.getElementById("buySharesButton"),
@@ -502,6 +510,8 @@ const elements = {
   maxSellButton: document.getElementById("maxSellButton"),
   tradeHint: document.getElementById("tradeHint"),
   handCards: document.getElementById("handCards"),
+  deckSummary: document.getElementById("deckSummary"),
+  deckList: document.getElementById("deckList"),
   logList: document.getElementById("logList"),
   effectBadges: document.getElementById("effectBadges"),
   rewardModal: document.getElementById("rewardModal"),
@@ -558,12 +568,15 @@ function resetGame() {
   gameState.pendingReward = null;
   gameState.selectedRewardCard = null;
   gameState.selectedRewardPassive = null;
+  gameState.stageRiskUsed = false;
+  gameState.priceHistory = [];
   gameState.logs = [];
 
   elements.rewardModal.classList.add("hidden");
   elements.resultModal.classList.add("hidden");
+  recordMarketPrice("START");
   setupStage(0);
-  addLog("ゲーム開始。全5ステージの短期決戦を開始します。各ステージ3ターン以内にボスHPを削り切ってください。");
+  addLog("ゲーム開始。全5ステージの短期決戦を開始します。各ステージ4ターン以内にボスHPを削り切ってください。");
   startTurn();
 }
 
@@ -723,6 +736,11 @@ function prepareStageTurnOmen() {
     return;
   }
 
+  if (gameState.stageTurn < STAGE_TURNS) {
+    gameState.currentOmen = `調整ターン。${getCurrentStage().bossName} の本命イベント前に、保有口数と現金比率を整えてください。`;
+    return;
+  }
+
   gameState.currentOmen = `ボスターン。${getCurrentStage().bossName} のイベントがターン終了時に発生します。`;
   triggerDelayedImpact("BOSS TURN", "boss");
 }
@@ -747,16 +765,16 @@ function createBossOmen() {
   }
   if (stageIndex === 2) {
     return precise
-      ? "空売りファンドはTechNovaの過大ポジションを狙っている。現金比率25%以上なら圧力は軽くなる。"
+      ? "空売りファンドは過大ポジションを狙っている。現金比率25%以上なら圧力は軽くなる。"
       : "空売りファンドが信用残と過大ポジションを監視している。現金を残すほど安全。";
   }
   if (stageIndex === 3) {
     return precise
-      ? "中央銀行はTechNovaに強い下落圧力。現金比率35%以上ならショック後の買い余力として評価される。"
-      : "金融引き締めの予兆。成長株と信用取引に警戒。";
+      ? "中央銀行は市場価格に強い下落圧力。現金比率35%以上ならショック後の買い余力として評価される。"
+      : "金融引き締めの予兆。高ボラティリティと信用取引に警戒。";
   }
   return precise
-    ? "ブラックマンデー後、TechNovaに大反発の買いが入りそう。暴落前の現金と暴落耐性が鍵。"
+    ? "ブラックマンデー後、市場価格に大反発の買いが入りそう。暴落前の現金と暴落耐性が鍵。"
     : "全面暴落の予兆。ただし暴落後に強い反発資金が向かう気配。";
 }
 
@@ -780,6 +798,14 @@ function resolveStageTurnEvent() {
     return;
   }
 
+  if (gameState.stageTurn < STAGE_TURNS) {
+    const event = selectMarketEvent();
+    addLog(`調整ターン市場: <strong>${event.name}</strong> - ${event.description}`);
+    applyPriceChanges(scaleChanges(event.changes, getCurrentStage().marketMultiplier * 0.65), event.name);
+    resolveStagePressure();
+    return;
+  }
+
   addLog(`ボスイベント: <strong>${getCurrentStage().bossName}</strong> が動きます。`);
   triggerImpact("BOSS EVENT", "boss");
   resolveBossEvent();
@@ -788,14 +814,14 @@ function resolveStageTurnEvent() {
 function resolveStagePressure() {
   if (gameState.stageIndex === 1 && gameState.stageTurn < STAGE_TURNS) {
     const techMove = randomItem([-0.12, -0.08, 0.08, 0.12]);
-    addLog("SNS相場のボラティリティ上昇: TechNovaが荒い値動き。");
+    addLog("SNS相場のボラティリティ上昇: 市場価格が荒い値動き。");
     applyPriceChanges({ TECH: techMove }, "SNSボラティリティ");
     return;
   }
 
   if (gameState.stageIndex !== 3) return;
   const pressure = gameState.stageTurn === 1 ? -0.10 : -0.08;
-  addLog("中央銀行の継続圧力: TechNovaに金融引き締め売り。");
+  addLog("中央銀行の継続圧力: 市場価格に金融引き締め売り。");
   applyPriceChanges({ TECH: pressure }, "中央銀行の継続圧力");
 }
 
@@ -898,7 +924,7 @@ function resolveBossDamage() {
     gameState.stageDamage += damage;
     gameState.lastOverkill = Math.max(0, damage - hpBefore);
     if (concentrationPenalty < 1) {
-      addLog("ポジション過大: 総資産の70%超を株で持っているため、ボスへのダメージ効率が25%低下。");
+      addLog("ポジション過大: 総資産の70%超を建てているため、ボスへのダメージ効率が25%低下。");
     }
     addLog(`利益 ${formatYen(baseDamage)} × COMBO ${multiplier.toFixed(2)} + 読み切り ${formatYen(bonusDamage)} = <strong>${formatYen(damage)}</strong> ダメージ。残HP ${formatYen(gameState.bossHp)}。`);
     triggerImpact(`${formatYen(damage)} DAMAGE`, "damage");
@@ -929,7 +955,7 @@ function resolveOverheatCorrections() {
 
   if (Object.keys(corrections).length === 0) return;
 
-  addLog("過熱反動: 上昇カードで買われすぎた銘柄に利確売りが発生。");
+  addLog("過熱反動: 上昇カードで買われすぎた価格帯に利確売りが発生。");
   triggerImpact("OVERHEAT SELL", "warning");
   applyPriceChanges(corrections, "過熱反動");
 }
@@ -992,7 +1018,7 @@ function buyShares(symbol, sharesToBuy, source = "買付") {
   let bonusShares = 0;
   if (hasPassive("contrarian") && stock.price < stock.previousPrice) {
     bonusShares = Math.max(1, Math.floor(sharesToBuy * 0.1));
-    addLog(`逆張り投資家: 下落銘柄の買付量が${bonusShares}株増加。`);
+    addLog(`逆張り投資家: 下落時の買付量が${bonusShares}口増加。`);
   }
 
   if (sharesToBuy <= 0) {
@@ -1004,7 +1030,7 @@ function buyShares(symbol, sharesToBuy, source = "買付") {
   const fee = calculateTradeFee(subtotal);
   const cost = subtotal + fee;
   if (cost > gameState.cash) {
-    addLog(`${stock.name}を${sharesToBuy}株購入する現金が不足しています。`);
+    addLog(`${sharesToBuy}口購入する現金が不足しています。`);
     return false;
   }
 
@@ -1013,7 +1039,7 @@ function buyShares(symbol, sharesToBuy, source = "買付") {
   stock.averageCost = (currentCost + subtotal) / (stock.shares + totalShares);
   stock.shares += totalShares;
   gameState.cash -= cost;
-  addLog(`${source}: ${stock.name}を${totalShares}株購入。約定代金 ${formatYen(subtotal)} / 手数料 ${formatYen(fee)}。`);
+  addLog(`${source}: ${totalShares}口購入。約定代金 ${formatYen(subtotal)} / 手数料 ${formatYen(fee)}。`);
   triggerImpact(`BUY ${stock.name}`, "trade");
   return true;
 }
@@ -1032,7 +1058,7 @@ function sellShares(symbol, sharesToSell, source = "売却") {
   }
 
   if (sharesToSell > stock.shares) {
-    addLog(`${stock.name}の保有株数を超えて売却することはできません。`);
+    addLog(`保有口数を超えて売却することはできません。`);
     return false;
   }
 
@@ -1045,7 +1071,7 @@ function sellShares(symbol, sharesToSell, source = "売却") {
     stock.holdingTurns = 0;
   }
   gameState.cash += revenue;
-  addLog(`${source}: ${stock.name}を${sharesToSell}株売却。受取 ${formatYen(revenue)} / 手数料 ${formatYen(fee)}。`);
+  addLog(`${source}: ${sharesToSell}口売却。受取 ${formatYen(revenue)} / 手数料 ${formatYen(fee)}。`);
   triggerImpact(`SELL ${stock.name}`, "trade");
   return true;
 }
@@ -1083,7 +1109,7 @@ function sellHalfOfAllStocks() {
   });
 
   gameState.cash += totalRevenue;
-  addLog(`現金比率アップ: 保有株の半分を売却し、${formatYen(totalRevenue)}を現金化しました。`);
+  addLog(`現金比率アップ: 保有ポジションの半分を売却し、${formatYen(totalRevenue)}を現金化しました。`);
 }
 
 function applyPriceChanges(changes, source) {
@@ -1097,9 +1123,23 @@ function applyPriceChanges(changes, source) {
     const oldPrice = stock.price;
     stock.price = Math.max(100, Math.round(stock.price * (1 + leveragedPercent)));
     updateStockHeat(stock, leveragedPercent, source);
+    recordMarketPrice(source);
     const sign = leveragedPercent >= 0 ? "+" : "";
     addLog(`${stock.name}: ${formatYen(oldPrice)} → ${formatYen(stock.price)} (${sign}${formatPercent(leveragedPercent)})`);
   });
+}
+
+function recordMarketPrice(source) {
+  const stock = gameState.stocks[0];
+  if (!stock) return;
+  gameState.priceHistory.push({
+    price: stock.price,
+    source,
+    turn: gameState.turn,
+    stage: gameState.stageIndex + 1,
+    stageTurn: gameState.stageTurn
+  });
+  gameState.priceHistory = gameState.priceHistory.slice(-48);
 }
 
 function updateStockHeat(stock, percent, source) {
@@ -1188,11 +1228,11 @@ function resolveMarginRisk() {
   });
 
   if (Object.keys(shock).length === 0) {
-    addLog("信用取引のリスク判定は発生しましたが、保有株がありませんでした。");
+    addLog("信用取引のリスク判定は発生しましたが、保有ポジションがありませんでした。");
     return;
   }
 
-  addLog("信用取引の追証リスク発生。保有銘柄に追加ショック -15%。");
+  addLog("信用取引の追証リスク発生。保有ポジションに追加ショック -15%。");
   applyPriceChanges(shock, "信用取引リスク");
 }
 
@@ -1226,7 +1266,7 @@ const RELIC_DEFINITIONS = [
   {
     id: "compoundSeed",
     name: "複利の種",
-    description: "ターン終了時、保有株評価額の1%を配当として現金に得る。"
+    description: "ターン終了時、ポジション評価額の1%を配当として現金に得る。"
   },
   {
     id: "tradingTerminal",
@@ -1302,7 +1342,7 @@ function resolvePassiveEndOfTurnEffects() {
     }
   });
   if (Object.keys(changes).length === 0) return;
-  addLog("長期投資家: 2ターン以上保有している銘柄に評価見直し。");
+  addLog("長期投資家: 2ターン以上保有しているポジションに評価見直し。");
   applyPriceChanges(changes, "長期投資家");
 }
 
@@ -1483,7 +1523,7 @@ function executeManualTrade(type) {
   const symbol = elements.tradeStockSelect.value;
   const shares = Math.floor(Number(elements.tradeSharesInput.value));
   if (!symbol || !Number.isFinite(shares) || shares <= 0) {
-    addLog("売買株数は1以上の整数で入力してください。");
+    addLog("売買口数は1以上の整数で入力してください。");
     render();
     return;
   }
@@ -1510,9 +1550,10 @@ function fillMaxShares(type) {
 function render() {
   renderStatus();
   renderStageInfo();
-  renderStocks();
+  renderMarketScreen();
   renderTradePanel();
   renderHand();
+  renderDeckView();
   renderLogs();
   renderEffects();
   elements.startButton.disabled = gameState.started && !gameState.gameOver;
@@ -1520,12 +1561,17 @@ function render() {
 }
 
 function renderStatus() {
+  const stockValue = calculateStockValue();
+  const totalAssets = calculateTotalAssets();
+  const stageProfit = gameState.started ? totalAssets - gameState.stageStartAssets : 0;
   elements.turnText.textContent = gameState.started ? `${gameState.turn} / ${MAX_TURNS}` : "-";
   elements.stageText.textContent = gameState.started ? `${gameState.stageIndex + 1} / ${MAX_STAGES}` : "-";
   elements.stageTurnText.textContent = gameState.started ? `${gameState.stageTurn} / ${STAGE_TURNS}` : "-";
   elements.cashText.textContent = formatYen(gameState.cash);
-  elements.stockValueText.textContent = formatYen(calculateStockValue());
-  elements.totalAssetText.textContent = formatYen(calculateTotalAssets());
+  elements.stockValueText.textContent = formatYen(stockValue);
+  elements.totalAssetText.textContent = formatYen(totalAssets);
+  elements.stockValueText.className = stockValue > 0 ? "positive" : "neutral";
+  elements.totalAssetText.className = gameState.started ? changeClass(stageProfit) : "neutral";
   elements.playedCountText.textContent = `使用済み ${gameState.playedThisTurn} / ${MAX_CARDS_PER_TURN}`;
 }
 
@@ -1560,29 +1606,71 @@ function renderPassiveList() {
   return names.map((name) => `<span class="passive-chip">${name}</span>`).join("");
 }
 
-function renderStocks() {
-  elements.stockTableBody.innerHTML = "";
-  gameState.stocks.forEach((stock) => {
-    const row = document.createElement("tr");
-    const change = stock.previousPrice === 0 ? 0 : (stock.price - stock.previousPrice) / stock.previousPrice;
-    row.innerHTML = `
-      <td>
-        <div class="stock-name">
-          <img class="stock-icon" src="${STOCK_ICONS[stock.symbol]}" alt="" aria-hidden="true">
-          <div class="stock-copy">
-            <strong>${stock.name}</strong>
-            <span>${stock.type} / ${stock.note}</span>
-          </div>
-        </div>
-      </td>
-      <td>${formatYen(stock.price)}</td>
-      <td class="${changeClass(change)}">${change >= 0 ? "+" : ""}${formatPercent(change)}</td>
-      <td>${renderHeat(stock.heat)}</td>
-      <td>${stock.shares.toLocaleString("ja-JP")}株</td>
-      <td>${formatYen(stock.price * stock.shares)}</td>
-    `;
-    elements.stockTableBody.appendChild(row);
+function renderMarketScreen() {
+  const stock = gameState.stocks[0];
+  if (!stock) {
+    elements.marketPriceText.textContent = "-";
+    elements.marketChangeText.textContent = "-";
+    elements.marketHeatText.textContent = "-";
+    elements.priceChart.innerHTML = `<div class="empty-state">ゲーム開始後、価格チャートが表示されます。</div>`;
+    elements.positionSharesText.textContent = "-";
+    elements.positionValueText.textContent = "-";
+    elements.averageCostText.textContent = "-";
+    elements.unrealizedProfitText.textContent = "-";
+    return;
+  }
+
+  const change = stock.previousPrice === 0 ? 0 : (stock.price - stock.previousPrice) / stock.previousPrice;
+  const positionValue = stock.price * stock.shares;
+  const unrealizedProfit = stock.shares > 0 ? positionValue - stock.averageCost * stock.shares : 0;
+
+  elements.marketPriceText.textContent = formatYen(stock.price);
+  elements.marketPriceText.className = changeClass(change);
+  elements.marketChangeText.textContent = `${change >= 0 ? "+" : ""}${formatPercent(change)}`;
+  elements.marketChangeText.className = changeClass(change);
+  elements.marketHeatText.innerHTML = renderHeat(stock.heat);
+  elements.positionSharesText.textContent = `${stock.shares.toLocaleString("ja-JP")}口`;
+  elements.positionValueText.textContent = formatYen(positionValue);
+  elements.positionValueText.className = positionValue > 0 ? "positive" : "neutral";
+  elements.averageCostText.textContent = formatYen(stock.averageCost || 0);
+  elements.unrealizedProfitText.textContent = `${unrealizedProfit >= 0 ? "+" : ""}${formatYen(unrealizedProfit)}`;
+  elements.unrealizedProfitText.className = changeClass(unrealizedProfit);
+  elements.priceChart.innerHTML = renderPriceChart();
+}
+
+function renderPriceChart() {
+  const history = gameState.priceHistory.length > 0 ? gameState.priceHistory : [{ price: STOCK_TEMPLATES[0].price }];
+  const prices = history.map((point) => point.price);
+  const width = 640;
+  const height = 260;
+  const padding = 24;
+  const minPrice = Math.min(...prices);
+  const maxPrice = Math.max(...prices);
+  const range = Math.max(1, maxPrice - minPrice);
+  const points = prices.map((price, index) => {
+    const x = prices.length === 1 ? padding : padding + (index / (prices.length - 1)) * (width - padding * 2);
+    const y = height - padding - ((price - minPrice) / range) * (height - padding * 2);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
   });
+  const last = prices[prices.length - 1];
+  const first = prices[0];
+  const chartClass = last >= first ? "chart-line positive-line" : "chart-line negative-line";
+  const lastPoint = points[points.length - 1].split(",");
+
+  return `
+    <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="価格チャート">
+      <defs>
+        <pattern id="chartGrid" width="32" height="32" patternUnits="userSpaceOnUse">
+          <path d="M 32 0 L 0 0 0 32" fill="none" stroke="rgba(159,176,173,0.18)" stroke-width="1"/>
+        </pattern>
+      </defs>
+      <rect x="0" y="0" width="${width}" height="${height}" fill="url(#chartGrid)"></rect>
+      <polyline class="${chartClass}" points="${points.join(" ")}"></polyline>
+      <circle class="chart-last-point" cx="${lastPoint[0]}" cy="${lastPoint[1]}" r="6"></circle>
+      <text x="${padding}" y="24" class="chart-label">${formatYen(maxPrice)}</text>
+      <text x="${padding}" y="${height - 8}" class="chart-label">${formatYen(minPrice)}</text>
+    </svg>
+  `;
 }
 
 function renderHeat(heat) {
@@ -1599,7 +1687,7 @@ function renderTradePanel() {
   gameState.stocks.forEach((stock) => {
     const option = document.createElement("option");
     option.value = stock.symbol;
-    option.textContent = `${stock.name} / ${formatYen(stock.price)} / 保有 ${stock.shares}株`;
+    option.textContent = `${stock.name} / ${formatYen(stock.price)} / 保有 ${stock.shares}口`;
     elements.tradeStockSelect.appendChild(option);
   });
 
@@ -1617,11 +1705,11 @@ function renderTradePanel() {
   elements.tradeStockSelect.disabled = disabled;
 
   if (!stock) {
-    elements.tradeHint.textContent = "ゲーム開始後、株数を指定していつでも売買できます。";
+    elements.tradeHint.textContent = "ゲーム開始後、口数を指定していつでも売買できます。";
     return;
   }
 
-  elements.tradeHint.textContent = `買付可能 ${maxBuy.toLocaleString("ja-JP")}株 / 売却可能 ${maxSell.toLocaleString("ja-JP")}株 / 平均取得 ${formatYen(stock.averageCost || 0)}`;
+  elements.tradeHint.textContent = `買付可能 ${maxBuy.toLocaleString("ja-JP")}口 / 売却可能 ${maxSell.toLocaleString("ja-JP")}口 / 平均取得 ${formatYen(stock.averageCost || 0)}`;
 }
 
 function renderHand() {
@@ -1644,6 +1732,34 @@ function renderHand() {
     });
     elements.handCards.appendChild(cardElement);
   });
+}
+
+function renderDeckView() {
+  if (!elements.deckList || !elements.deckSummary) return;
+  if (!gameState.started) {
+    elements.deckSummary.textContent = "Deck -";
+    elements.deckList.innerHTML = `<span class="deck-empty">ゲーム開始後にデッキ内容を表示</span>`;
+    return;
+  }
+
+  const counts = gameState.deck.reduce((map, cardInstance) => {
+    map.set(cardInstance.cardId, (map.get(cardInstance.cardId) || 0) + 1);
+    return map;
+  }, new Map());
+  const orderedCards = [...counts.entries()]
+    .map(([cardId, count]) => ({ card: CARD_DEFINITIONS[cardId], count }))
+    .sort((a, b) => rarityRank(b.card.rarity) - rarityRank(a.card.rarity) || a.card.name.localeCompare(b.card.name, "ja"));
+
+  elements.deckSummary.textContent = `Deck ${gameState.deck.length} / 山札 ${gameState.drawPile.length} / 捨札 ${gameState.discardPile.length}`;
+  elements.deckList.innerHTML = orderedCards
+    .map(({ card, count }) => `<span class="deck-pill ${card.rarity.toLowerCase()}">${card.name}<b>x${count}</b></span>`)
+    .join("");
+}
+
+function rarityRank(rarity) {
+  if (rarity === "Epic") return 3;
+  if (rarity === "Rare") return 2;
+  return 1;
 }
 
 function createCardElement(card, options) {
@@ -1709,10 +1825,16 @@ function renderLogs() {
   elements.logList.innerHTML = "";
   gameState.logs.forEach((log) => {
     const item = document.createElement("div");
-    item.className = "log-item";
+    item.className = `log-item ${getLogToneClass(log.message)}`;
     item.innerHTML = `<strong>S${log.stage}-${log.stageTurn}</strong> ${log.message}`;
     elements.logList.appendChild(item);
   });
+}
+
+function getLogToneClass(message) {
+  if (/(\+|上昇|利益|ボーナス|獲得|改善|DAMAGE|撃破|反発)/.test(message)) return "log-positive";
+  if (/(-|下落|損|暴落|炎上|悪化|リスク|NO DAMAGE|失敗)/.test(message)) return "log-negative";
+  return "";
 }
 
 function renderEffects() {
