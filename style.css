@@ -405,6 +405,23 @@ button:disabled {
   text-shadow: 2px 2px 0 #05070b;
 }
 
+.heat {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+  text-shadow: 2px 2px 0 #05070b;
+}
+
+.heat.mid {
+  color: var(--yellow);
+}
+
+.heat.high {
+  color: var(--red);
+  animation: impact-flash 520ms steps(2) infinite;
+}
+
 .stock-name {
   display: flex;
   align-items: center;

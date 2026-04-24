@@ -530,7 +530,8 @@ function createInitialStock(template) {
     previousPrice: template.price,
     shares: 0,
     averageCost: 0,
-    holdingTurns: 0
+    holdingTurns: 0,
+    heat: 0
   };
 }
 
@@ -645,6 +646,7 @@ function endTurn() {
   updateHoldingTurns();
   resolvePassiveEndOfTurnEffects();
   resolveEndOfTurnRelics();
+  resolveOverheatCorrections();
 
   gameState.effects.margin = false;
   resolveBossDamage();
@@ -891,12 +893,18 @@ function resolveBossDamage() {
   if (baseDamage > 0 || bonusDamage > 0) {
     gameState.damageCombo += 1;
     const multiplier = getDamageComboMultiplier();
-    const damage = Math.floor(baseDamage * multiplier) + bonusDamage;
+    const concentrationRate = getLargestHoldingExposure();
+    const concentrationPenalty = gameState.stageIndex >= 1 && concentrationRate > 0.7 ? 0.75 : 1;
+    const rawDamage = Math.floor(baseDamage * multiplier) + bonusDamage;
+    const damage = Math.floor(rawDamage * concentrationPenalty);
     const hpBefore = gameState.bossHp;
     gameState.bossHp = Math.max(0, gameState.bossHp - damage);
     gameState.lastDamage = damage;
     gameState.stageDamage += damage;
     gameState.lastOverkill = Math.max(0, damage - hpBefore);
+    if (concentrationPenalty < 1) {
+      addLog("集中リスク: 1銘柄偏重のためボスへのダメージ効率が25%低下。");
+    }
     addLog(`利益 ${formatYen(baseDamage)} × COMBO ${multiplier.toFixed(2)} + 読み切り ${formatYen(bonusDamage)} = <strong>${formatYen(damage)}</strong> ダメージ。残HP ${formatYen(gameState.bossHp)}。`);
     triggerImpact(`${formatYen(damage)} DAMAGE`, "damage");
     pulseElement(elements.bossHpFill, "hit");
@@ -912,6 +920,23 @@ function resolveBossDamage() {
 
 function getDamageComboMultiplier() {
   return Math.min(2, 1 + Math.max(0, gameState.damageCombo - 1) * 0.25);
+}
+
+function resolveOverheatCorrections() {
+  const corrections = {};
+
+  gameState.stocks.forEach((stock) => {
+    if (stock.heat < 6) return;
+    const correction = stock.heat >= 8 ? -0.24 : -0.15;
+    corrections[stock.symbol] = correction;
+    stock.heat = Math.max(0, stock.heat - 5);
+  });
+
+  if (Object.keys(corrections).length === 0) return;
+
+  addLog("過熱反動: 上昇カードで買われすぎた銘柄に利確売りが発生。");
+  triggerImpact("OVERHEAT SELL", "warning");
+  applyPriceChanges(corrections, "過熱反動");
 }
 
 function resolveStageEnd() {
@@ -1075,9 +1100,25 @@ function applyPriceChanges(changes, source) {
     const leveragedPercent = percent * leverage;
     const oldPrice = stock.price;
     stock.price = Math.max(100, Math.round(stock.price * (1 + leveragedPercent)));
+    updateStockHeat(stock, leveragedPercent, source);
     const sign = leveragedPercent >= 0 ? "+" : "";
     addLog(`${stock.name}: ${formatYen(oldPrice)} → ${formatYen(stock.price)} (${sign}${formatPercent(leveragedPercent)})`);
   });
+}
+
+function updateStockHeat(stock, percent, source) {
+  if (source.includes("過熱反動")) return;
+
+  if (percent > 0) {
+    const addedHeat = Math.max(1, Math.ceil(percent * 10));
+    stock.heat = Math.min(9, stock.heat + addedHeat);
+    return;
+  }
+
+  if (percent < 0) {
+    const cooledHeat = Math.max(1, Math.ceil(Math.abs(percent) * 8));
+    stock.heat = Math.max(0, stock.heat - cooledHeat);
+  }
 }
 
 function getMarginMultiplier(percent) {
@@ -1237,6 +1278,12 @@ function getLargestHoldingSymbol() {
   if (holdings.length === 0) return null;
   holdings.sort((a, b) => (b.shares * b.price) - (a.shares * a.price));
   return holdings[0].symbol;
+}
+
+function getLargestHoldingExposure() {
+  const total = calculateTotalAssets();
+  if (total <= 0) return 0;
+  return gameState.stocks.reduce((max, stock) => Math.max(max, (stock.price * stock.shares) / total), 0);
 }
 
 function updateHoldingTurns() {
@@ -1534,11 +1581,19 @@ function renderStocks() {
       </td>
       <td>${formatYen(stock.price)}</td>
       <td class="${changeClass(change)}">${change >= 0 ? "+" : ""}${formatPercent(change)}</td>
+      <td>${renderHeat(stock.heat)}</td>
       <td>${stock.shares.toLocaleString("ja-JP")}株</td>
       <td>${formatYen(stock.price * stock.shares)}</td>
     `;
     elements.stockTableBody.appendChild(row);
   });
+}
+
+function renderHeat(heat) {
+  const level = Math.min(9, Math.max(0, heat || 0));
+  const className = level >= 6 ? "heat high" : level >= 3 ? "heat mid" : "heat";
+  const pips = level > 0 ? "■".repeat(Math.ceil(level / 2)) : "□";
+  return `<span class="${className}" title="過熱度: 高いほど反動売りが起きやすい">${pips} ${level}</span>`;
 }
 
 function renderTradePanel() {
@@ -1669,12 +1724,14 @@ function renderEffects() {
     .filter(Boolean)
     .map((relic) => relic.name)
     .join(" / ");
+  const concentration = Math.round(getLargestHoldingExposure() * 100);
   const badges = [
     { label: "信用取引", active: gameState.effects.margin },
     { label: `分散 ${gameState.effects.diversifyCharges}`, active: gameState.effects.diversifyCharges > 0 },
     { label: `暴落耐性 ${gameState.effects.crashGuards}`, active: gameState.effects.crashGuards > 0 },
     { label: `倍率 ${gameState.effects.upsideBoostCharges}`, active: gameState.effects.upsideBoostCharges > 0 },
     { label: `分岐 ${gameState.effects.marketChoiceCharges}`, active: gameState.effects.marketChoiceCharges > 0 },
+    { label: `集中 ${concentration}%`, active: concentration > 70 },
     { label: `パッシブ ${gameState.passives.length}`, active: gameState.passives.length > 0 },
     { label: `レリック ${gameState.relics.length}${relicNames ? `: ${relicNames}` : ""}`, active: gameState.relics.length > 0 },
     { label: `山札 ${gameState.drawPile.length}`, active: false },
