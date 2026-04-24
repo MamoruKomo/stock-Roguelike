@@ -11,6 +11,13 @@ const STOCK_TEMPLATES = [
   { symbol: "GREEN", name: "GreenEnergy", type: "テーマ株", price: 3000, note: "ニュースカードの影響を受けやすい" }
 ];
 
+const STOCK_ICONS = {
+  TECH: "assets/icon_technova.png",
+  CARE: "assets/icon_carelink.png",
+  GAME: "assets/icon_gameforge.png",
+  GREEN: "assets/icon_greenenergy.png"
+};
+
 const MARKET_EVENTS = [
   {
     name: "全体相場上昇",
@@ -922,8 +929,11 @@ function renderStocks() {
     row.innerHTML = `
       <td>
         <div class="stock-name">
-          <strong>${stock.name}</strong>
-          <span>${stock.type} / ${stock.note}</span>
+          <img class="stock-icon" src="${STOCK_ICONS[stock.symbol]}" alt="" aria-hidden="true">
+          <div class="stock-copy">
+            <strong>${stock.name}</strong>
+            <span>${stock.type} / ${stock.note}</span>
+          </div>
         </div>
       </td>
       <td>${formatYen(stock.price)}</td>
@@ -991,7 +1001,7 @@ function renderHand() {
 
 function createCardElement(card, options) {
   const element = document.createElement("article");
-  element.className = `card ${card.rarity.toLowerCase()}`;
+  element.className = `card ${card.rarity.toLowerCase()} ${getCardFrameClass(card)}`;
 
   const targets = getTargetsForCard(card);
   const isTargetCard = card.target !== "none" && !options.reward;
@@ -1039,6 +1049,12 @@ function createCardElement(card, options) {
 
   if (disabled) element.classList.add("disabled");
   return element;
+}
+
+function getCardFrameClass(card) {
+  if (card.category === "ニュース") return "card-frame-news";
+  if (card.category === "防御") return "card-frame-defense";
+  return "card-frame-action";
 }
 
 function renderLogs() {

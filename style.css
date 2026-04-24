@@ -11,6 +11,7 @@
   --blue: #54a9ff;
   --purple: #b989ff;
   --shadow: 0 18px 40px rgba(0, 0, 0, 0.28);
+  --pixel-font: "Courier New", "Hiragino Sans", "Yu Gothic", Meiryo, monospace;
 }
 
 * {
@@ -24,8 +25,14 @@ body {
     radial-gradient(circle at top left, rgba(84, 169, 255, 0.14), transparent 30%),
     linear-gradient(135deg, #09101a 0%, #0b1018 46%, #12110d 100%);
   color: var(--text);
-  font-family: Arial, "Hiragino Sans", "Yu Gothic", Meiryo, sans-serif;
+  font-family: var(--pixel-font);
   letter-spacing: 0;
+}
+
+img,
+.topbar,
+.card {
+  image-rendering: pixelated;
 }
 
 button,
@@ -61,6 +68,29 @@ button:disabled {
   justify-content: space-between;
   gap: 24px;
   margin-bottom: 18px;
+  min-height: 176px;
+  border: 1px solid rgba(57, 217, 138, 0.32);
+  border-radius: 8px;
+  padding: 22px 24px;
+  overflow: hidden;
+  position: relative;
+  background:
+    linear-gradient(90deg, rgba(5, 11, 18, 0.82), rgba(5, 11, 18, 0.24) 52%, rgba(5, 11, 18, 0.88)),
+    url("assets/title_bg.png") center 43% / cover no-repeat;
+  box-shadow: var(--shadow);
+}
+
+.topbar::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 2px solid rgba(57, 217, 138, 0.2);
+  pointer-events: none;
+}
+
+.topbar > * {
+  position: relative;
+  z-index: 1;
 }
 
 .topbar h1,
@@ -70,8 +100,10 @@ button:disabled {
 }
 
 .topbar h1 {
-  font-size: 28px;
+  color: #dfffe4;
+  font-size: 30px;
   font-weight: 800;
+  text-shadow: 0 2px 0 #06140a, 0 0 12px rgba(57, 217, 138, 0.7);
 }
 
 .eyebrow {
@@ -235,6 +267,22 @@ button:disabled {
 }
 
 .stock-name {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.stock-icon {
+  width: 54px;
+  height: 54px;
+  flex: 0 0 54px;
+  border: 1px solid rgba(143, 160, 183, 0.34);
+  border-radius: 6px;
+  background: rgba(4, 8, 14, 0.36);
+  object-fit: cover;
+}
+
+.stock-copy {
   display: grid;
   gap: 5px;
 }
@@ -351,25 +399,58 @@ button:disabled {
 }
 
 .card {
+  position: relative;
   display: flex;
   flex-direction: column;
-  min-height: 245px;
-  border: 1px solid var(--line);
+  min-height: 330px;
+  border: 0;
   border-radius: 8px;
-  padding: 14px;
-  background: linear-gradient(180deg, rgba(24, 36, 53, 0.98), rgba(15, 23, 34, 0.98));
+  padding: 30px 22px 24px;
+  overflow: hidden;
+  background-color: #0b1018;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+  color: #f3f7ef;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.82);
 }
 
-.card.common {
-  border-color: rgba(143, 160, 183, 0.45);
+.card::before {
+  content: "";
+  position: absolute;
+  inset: 14px;
+  border-radius: 6px;
+  background: linear-gradient(180deg, rgba(3, 8, 12, 0.74), rgba(3, 8, 12, 0.88));
+  pointer-events: none;
 }
 
-.card.rare {
-  border-color: rgba(84, 169, 255, 0.72);
+.card > * {
+  position: relative;
+  z-index: 1;
 }
 
-.card.epic {
-  border-color: rgba(185, 137, 255, 0.78);
+.card-frame-action {
+  background-image: url("assets/card_action.png");
+}
+
+.card-frame-news {
+  background-image: url("assets/card_news.png");
+}
+
+.card-frame-defense {
+  background-image: url("assets/card_defense.png");
+}
+
+.card.common::before {
+  box-shadow: inset 0 0 0 1px rgba(143, 160, 183, 0.18);
+}
+
+.card.rare::before {
+  box-shadow: inset 0 0 0 1px rgba(84, 169, 255, 0.34);
+}
+
+.card.epic::before {
+  box-shadow: inset 0 0 0 1px rgba(185, 137, 255, 0.42);
 }
 
 .card-top {
@@ -386,9 +467,10 @@ button:disabled {
 
 .rarity {
   align-self: flex-start;
-  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 4px;
   padding: 4px 8px;
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.45);
   color: var(--muted);
   font-size: 11px;
   font-weight: 800;
@@ -404,7 +486,7 @@ button:disabled {
 
 .card p {
   margin: 0 0 12px;
-  color: #c6d1df;
+  color: #dce7d8;
   line-height: 1.55;
 }
 
