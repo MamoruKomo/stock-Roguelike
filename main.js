@@ -57,48 +57,48 @@ const MARKET_EVENTS = [
 const CARD_DEFINITIONS = {
   buy: {
     id: "buy",
-    name: "買付",
+    name: "押し目買いシグナル",
     rarity: "Common",
-    category: "投資行動",
-    description: "指定銘柄を、現金で買えるだけ購入する。",
+    category: "投資支援",
+    description: "指定銘柄を一時的に5%下落させる。常時売買で買い場を作るカード。",
     target: "all",
     use(target) {
-      buyStock(target, 1);
+      applyPriceChanges({ [target]: -0.05 }, "押し目買いシグナル");
     }
   },
   takeProfit: {
     id: "takeProfit",
-    name: "利確",
+    name: "利確ブースト",
     rarity: "Common",
-    category: "投資行動",
-    description: "保有している指定銘柄をすべて売却する。",
+    category: "投資支援",
+    description: "保有している指定銘柄を8%上昇させる。売却判断は常時売買で行う。",
     target: "owned",
     use(target) {
-      sellStock(target, 1, "利確");
+      applyPriceChanges({ [target]: 0.08 }, "利確ブースト");
     }
   },
   averageDown: {
     id: "averageDown",
     name: "ナンピン",
     rarity: "Common",
-    category: "投資行動",
-    description: "前ターン基準より下落している銘柄を追加購入する。",
+    category: "投資支援",
+    description: "前ターンより下落している保有銘柄の平均取得価格を10%改善する。",
     target: "dipped",
     use(target) {
-      buyStock(target, 0.65);
+      improveAverageCost(target, 0.10);
     }
   },
   stopLoss: {
     id: "stopLoss",
     name: "損切り",
     rarity: "Common",
-    category: "投資行動",
-    description: "指定銘柄をすべて売却し、次ターンに引くカードを1枚増やす。",
-    target: "owned",
-    use(target) {
-      sellStock(target, 1, "損切り");
+    category: "投資支援",
+    description: "次ターンに引くカードを1枚増やし、次の下落イベントを半減する。",
+    target: "none",
+    use() {
       gameState.nextDrawBonus += 1;
-      addLog("損切りにより、次ターンのドローが1枚増えます。");
+      gameState.effects.diversifyCharges += 1;
+      addLog("損切りルールを設定。次ターン+1ドロー、次の下落イベントを半減します。");
     }
   },
   margin: {
@@ -185,10 +185,12 @@ const CARD_DEFINITIONS = {
     name: "現金比率アップ",
     rarity: "Common",
     category: "防御",
-    description: "保有株の半分を売却して現金化する。",
+    description: "市場下落に備える。次の下落イベントを半減し、現金が5万円増える。",
     target: "none",
     use() {
-      sellHalfOfAllStocks();
+      gameState.effects.diversifyCharges += 1;
+      gameState.cash += 50000;
+      addLog(`現金比率アップ: 余力を${formatYen(50000)}増やし、次の下落を半減します。`);
     }
   },
   crashGuard: {
@@ -205,14 +207,14 @@ const CARD_DEFINITIONS = {
   },
   strongBuy: {
     id: "strongBuy",
-    name: "集中投資",
+    name: "仕手筋の噂",
     rarity: "Rare",
-    category: "投資行動",
-    description: "指定銘柄を買えるだけ購入し、その銘柄をさらに5%押し上げる。",
+    category: "ニュース",
+    description: "指定銘柄を12%上昇させ、次の上昇イベント倍率をさらに高める。",
     target: "all",
     use(target) {
-      buyStock(target, 1);
-      applyPriceChanges({ [target]: 0.05 }, "集中投資の需給");
+      applyPriceChanges({ [target]: 0.12 }, "仕手筋の噂");
+      gameState.effects.upsideBoostCharges += 1;
     }
   },
   megaEarnings: {
@@ -238,18 +240,79 @@ const CARD_DEFINITIONS = {
       gameState.effects.diversifyCharges += 1;
       addLog("鉄壁ヘッジを構築。下落無効化と半減を1回ずつ獲得しました。");
     }
+  },
+  diceRoll: {
+    id: "diceRoll",
+    name: "運命のダイス",
+    rarity: "Common",
+    category: "運試し",
+    description: "指定銘柄にランダムな値動き。-15%、+10%、+25%のどれかが出る。",
+    target: "all",
+    use(target) {
+      const outcomes = [-0.15, 0.10, 0.25];
+      const result = randomItem(outcomes);
+      addLog(`運命のダイス: ${formatPercent(result)} が出ました。`);
+      applyPriceChanges({ [target]: result }, "運命のダイス");
+    }
+  },
+  jokerMultiplier: {
+    id: "jokerMultiplier",
+    name: "ジョーカー倍率",
+    rarity: "Rare",
+    category: "コンボ",
+    description: "次に発生する上昇イベントの上昇率を1.5倍にする。",
+    target: "none",
+    use() {
+      gameState.effects.upsideBoostCharges += 1;
+      addLog("ジョーカー倍率を準備。次の上昇イベントを1.5倍にします。");
+    }
+  },
+  relicHunt: {
+    id: "relicHunt",
+    name: "レリック発見",
+    rarity: "Epic",
+    category: "レリック",
+    description: "ランダムな恒久効果を1つ獲得する。重複なし。",
+    target: "none",
+    use() {
+      gainRandomRelic();
+    }
+  },
+  deckThin: {
+    id: "deckThin",
+    name: "デッキ圧縮",
+    rarity: "Common",
+    category: "デッキ操作",
+    description: "山札か捨札からCommonカードを1枚除外する。このカードも使用後に除外される。",
+    target: "none",
+    exhaustOnUse: true,
+    use() {
+      removeWeakCardFromDeck();
+    }
+  },
+  marketBranch: {
+    id: "marketBranch",
+    name: "分岐ルート選択",
+    rarity: "Rare",
+    category: "市場操作",
+    description: "次の市場イベントは2候補から、現在の保有に有利な方を自動選択する。",
+    target: "none",
+    use() {
+      gameState.effects.marketChoiceCharges += 1;
+      addLog("分岐ルートを確保。次の市場イベントは2候補から有利な方を選びます。");
+    }
   }
 };
 
 const INITIAL_DECK = [
-  "buy",
   "buy",
   "takeProfit",
   "averageDown",
   "stopLoss",
   "goodEarnings",
   "diversify",
-  "cashRatio"
+  "diceRoll",
+  "deckThin"
 ];
 
 const REWARD_POOL = [
@@ -268,7 +331,12 @@ const REWARD_POOL = [
   "crashGuard",
   "strongBuy",
   "megaEarnings",
-  "ironGuard"
+  "ironGuard",
+  "diceRoll",
+  "jokerMultiplier",
+  "relicHunt",
+  "deckThin",
+  "marketBranch"
 ];
 
 const gameState = {
@@ -287,8 +355,11 @@ const gameState = {
   effects: {
     margin: false,
     diversifyCharges: 0,
-    crashGuards: 0
+    crashGuards: 0,
+    upsideBoostCharges: 0,
+    marketChoiceCharges: 0
   },
+  relics: [],
   logs: []
 };
 
@@ -303,6 +374,13 @@ const elements = {
   totalAssetText: document.getElementById("totalAssetText"),
   playedCountText: document.getElementById("playedCountText"),
   stockTableBody: document.getElementById("stockTableBody"),
+  tradeStockSelect: document.getElementById("tradeStockSelect"),
+  tradeSharesInput: document.getElementById("tradeSharesInput"),
+  buySharesButton: document.getElementById("buySharesButton"),
+  sellSharesButton: document.getElementById("sellSharesButton"),
+  maxBuyButton: document.getElementById("maxBuyButton"),
+  maxSellButton: document.getElementById("maxSellButton"),
+  tradeHint: document.getElementById("tradeHint"),
   handCards: document.getElementById("handCards"),
   logList: document.getElementById("logList"),
   effectBadges: document.getElementById("effectBadges"),
@@ -345,7 +423,8 @@ function resetGame() {
   gameState.hand = [];
   gameState.playedThisTurn = 0;
   gameState.nextDrawBonus = 0;
-  gameState.effects = { margin: false, diversifyCharges: 0, crashGuards: 0 };
+  gameState.effects = { margin: false, diversifyCharges: 0, crashGuards: 0, upsideBoostCharges: 0, marketChoiceCharges: 0 };
+  gameState.relics = [];
   gameState.logs = [];
 
   elements.rewardModal.classList.add("hidden");
@@ -359,7 +438,12 @@ function startTurn() {
 
   gameState.playedThisTurn = 0;
   gameState.effects.margin = false;
-  const drawCount = 3 + gameState.nextDrawBonus;
+  if (hasRelic("riskMeter")) {
+    gameState.effects.diversifyCharges += 1;
+    addLog("レリック「リスク計量器」: このターンの下落半減を1回獲得。");
+  }
+  const relicDrawBonus = hasRelic("tradingTerminal") ? 1 : 0;
+  const drawCount = 3 + gameState.nextDrawBonus + relicDrawBonus;
   gameState.nextDrawBonus = 0;
   drawCards(drawCount);
   addLog(`<strong>Turn ${gameState.turn}</strong> 開始。手札を${drawCount}枚引きました。`);
@@ -391,7 +475,12 @@ function useCard(instanceId, target) {
 
   card.use(target);
   gameState.hand.splice(handIndex, 1);
-  gameState.discardPile.push(cardInstance);
+  if (card.exhaustOnUse) {
+    removeCardInstanceFromDeck(cardInstance.instanceId);
+    addLog(`<strong>${card.name}</strong> は使用後にデッキから除外されました。`);
+  } else {
+    gameState.discardPile.push(cardInstance);
+  }
   gameState.playedThisTurn += 1;
   addLog(`カード使用: <strong>${card.name}</strong>`);
 
@@ -405,13 +494,15 @@ function endTurn() {
   gameState.discardPile.push(...gameState.hand);
   gameState.hand = [];
   setPreviousPrices();
-  const event = randomItem(MARKET_EVENTS);
+  const event = selectMarketEvent();
   addLog(`市場イベント: <strong>${event.name}</strong> - ${event.description}`);
   applyPriceChanges(event.changes, event.name);
 
   if (gameState.effects.margin) {
     resolveMarginRisk();
   }
+
+  resolveEndOfTurnRelics();
 
   gameState.effects.margin = false;
   checkGameEnd();
@@ -446,34 +537,65 @@ function buyStock(symbol, cashRatio) {
   const stock = findStock(symbol);
   const budget = Math.floor(gameState.cash * cashRatio);
   const sharesToBuy = Math.floor(budget / stock.price);
+  buyShares(symbol, sharesToBuy, "カード買付");
+}
 
+function buyShares(symbol, sharesToBuy, source = "買付") {
+  const stock = findStock(symbol);
   if (sharesToBuy <= 0) {
     addLog(`${stock.name}を購入する現金が不足しています。`);
-    return;
+    return false;
   }
 
   const cost = sharesToBuy * stock.price;
+  if (cost > gameState.cash) {
+    addLog(`${stock.name}を${sharesToBuy}株購入する現金が不足しています。`);
+    return false;
+  }
+
   const currentCost = stock.averageCost * stock.shares;
   stock.averageCost = (currentCost + cost) / (stock.shares + sharesToBuy);
   stock.shares += sharesToBuy;
   gameState.cash -= cost;
-  addLog(`${stock.name}を${sharesToBuy}株購入。約定代金 ${formatYen(cost)}。`);
+  addLog(`${source}: ${stock.name}を${sharesToBuy}株購入。約定代金 ${formatYen(cost)}。`);
+  return true;
 }
 
 function sellStock(symbol, ratio, reason) {
   const stock = findStock(symbol);
   const sharesToSell = Math.floor(stock.shares * ratio);
+  sellShares(symbol, sharesToSell, reason);
+}
 
+function sellShares(symbol, sharesToSell, source = "売却") {
+  const stock = findStock(symbol);
   if (sharesToSell <= 0) {
     addLog(`${stock.name}は保有していません。`);
-    return;
+    return false;
+  }
+
+  if (sharesToSell > stock.shares) {
+    addLog(`${stock.name}の保有株数を超えて売却することはできません。`);
+    return false;
   }
 
   const revenue = sharesToSell * stock.price;
   stock.shares -= sharesToSell;
   if (stock.shares === 0) stock.averageCost = 0;
   gameState.cash += revenue;
-  addLog(`${reason}: ${stock.name}を${sharesToSell}株売却。受取 ${formatYen(revenue)}。`);
+  addLog(`${source}: ${stock.name}を${sharesToSell}株売却。受取 ${formatYen(revenue)}。`);
+  return true;
+}
+
+function improveAverageCost(symbol, improvementRate) {
+  const stock = findStock(symbol);
+  if (stock.shares <= 0) {
+    addLog(`${stock.name}は保有していないため、平均取得価格を改善できません。`);
+    return;
+  }
+  const oldCost = stock.averageCost;
+  stock.averageCost *= 1 - improvementRate;
+  addLog(`${stock.name}の平均取得価格を ${formatYen(oldCost)} → ${formatYen(stock.averageCost)} に改善。`);
 }
 
 function sellHalfOfAllStocks() {
@@ -492,7 +614,7 @@ function sellHalfOfAllStocks() {
 }
 
 function applyPriceChanges(changes, source) {
-  const adjustedChanges = adjustDownside(changes, source);
+  const adjustedChanges = adjustUpside(adjustDownside(changes, source), source);
 
   Object.entries(adjustedChanges).forEach(([symbol, percent]) => {
     const stock = findStock(symbol);
@@ -503,6 +625,17 @@ function applyPriceChanges(changes, source) {
     const sign = leveragedPercent >= 0 ? "+" : "";
     addLog(`${stock.name}: ${formatYen(oldPrice)} → ${formatYen(stock.price)} (${sign}${formatPercent(leveragedPercent)})`);
   });
+}
+
+function adjustUpside(changes, source) {
+  const hasUpside = Object.values(changes).some((percent) => percent > 0);
+  if (!hasUpside || gameState.effects.upsideBoostCharges <= 0) return changes;
+
+  gameState.effects.upsideBoostCharges -= 1;
+  addLog(`ジョーカー倍率が発動。${source} の上昇率を1.5倍にしました。`);
+  return Object.fromEntries(
+    Object.entries(changes).map(([symbol, percent]) => [symbol, percent > 0 ? percent * 1.5 : percent])
+  );
 }
 
 function adjustDownside(changes, source) {
@@ -549,6 +682,97 @@ function resolveMarginRisk() {
   applyPriceChanges(shock, "信用取引リスク");
 }
 
+function selectMarketEvent() {
+  if (gameState.effects.marketChoiceCharges <= 0) return randomItem(MARKET_EVENTS);
+
+  gameState.effects.marketChoiceCharges -= 1;
+  const first = randomItem(MARKET_EVENTS);
+  let second = randomItem(MARKET_EVENTS);
+  while (second.name === first.name && MARKET_EVENTS.length > 1) {
+    second = randomItem(MARKET_EVENTS);
+  }
+
+  const firstScore = estimateEventImpact(first);
+  const secondScore = estimateEventImpact(second);
+  const selected = firstScore >= secondScore ? first : second;
+  const skipped = selected === first ? second : first;
+  addLog(`分岐ルート選択: 「${first.name}」と「${second.name}」から「${selected.name}」を選択。回避: ${skipped.name}`);
+  return selected;
+}
+
+function estimateEventImpact(event) {
+  return Object.entries(event.changes).reduce((score, [symbol, percent]) => {
+    const stock = findStock(symbol);
+    const holdingImpact = stock.shares > 0 ? stock.price * stock.shares * percent : stock.price * percent * 0.02;
+    return score + holdingImpact;
+  }, 0);
+}
+
+const RELIC_DEFINITIONS = [
+  {
+    id: "compoundSeed",
+    name: "複利の種",
+    description: "ターン終了時、保有株評価額の1%を配当として現金に得る。"
+  },
+  {
+    id: "tradingTerminal",
+    name: "証券端末",
+    description: "毎ターンのドロー枚数が1枚増える。"
+  },
+  {
+    id: "riskMeter",
+    name: "リスク計量器",
+    description: "各ターン開始時、下落イベント半減を1回得る。"
+  }
+];
+
+function gainRandomRelic() {
+  const candidates = RELIC_DEFINITIONS.filter((relic) => !gameState.relics.includes(relic.id));
+  if (candidates.length === 0) {
+    gameState.cash += 100000;
+    addLog(`全レリック取得済み。代わりに${formatYen(100000)}を得ました。`);
+    return;
+  }
+
+  const relic = randomItem(candidates);
+  gameState.relics.push(relic.id);
+  addLog(`レリック獲得: <strong>${relic.name}</strong> - ${relic.description}`);
+}
+
+function hasRelic(relicId) {
+  return gameState.relics.includes(relicId);
+}
+
+function resolveEndOfTurnRelics() {
+  if (!hasRelic("compoundSeed")) return;
+
+  const dividend = Math.floor(calculateStockValue() * 0.01);
+  if (dividend <= 0) return;
+  gameState.cash += dividend;
+  addLog(`レリック「複利の種」: 配当 ${formatYen(dividend)} を獲得。`);
+}
+
+function removeWeakCardFromDeck() {
+  const piles = [gameState.drawPile, gameState.discardPile];
+  for (const pile of piles) {
+    const index = pile.findIndex((cardInstance) => CARD_DEFINITIONS[cardInstance.cardId].rarity === "Common");
+    if (index === -1) continue;
+    const [removed] = pile.splice(index, 1);
+    removeCardInstanceFromDeck(removed.instanceId);
+    addLog(`デッキ圧縮: <strong>${CARD_DEFINITIONS[removed.cardId].name}</strong> を除外しました。`);
+    return;
+  }
+
+  gameState.nextDrawBonus += 1;
+  addLog("デッキ圧縮: 除外対象がないため、次ターンのドローを1枚増やしました。");
+}
+
+function removeCardInstanceFromDeck(instanceId) {
+  gameState.deck = gameState.deck.filter((cardInstance) => cardInstance.instanceId !== instanceId);
+  gameState.drawPile = gameState.drawPile.filter((cardInstance) => cardInstance.instanceId !== instanceId);
+  gameState.discardPile = gameState.discardPile.filter((cardInstance) => cardInstance.instanceId !== instanceId);
+}
+
 function showRewards() {
   const rewards = drawRewardChoices();
   elements.rewardCards.innerHTML = "";
@@ -588,7 +812,7 @@ function getTargetsForCard(card) {
     return gameState.stocks.filter((stock) => stock.shares > 0);
   }
   if (card.target === "dipped") {
-    return gameState.stocks.filter((stock) => stock.price < stock.previousPrice);
+    return gameState.stocks.filter((stock) => stock.shares > 0 && stock.price < stock.previousPrice);
   }
   return gameState.stocks;
 }
@@ -641,9 +865,40 @@ function addLog(message) {
   gameState.logs = gameState.logs.slice(0, 80);
 }
 
+function executeManualTrade(type) {
+  if (!gameState.started || gameState.gameOver) return;
+
+  const symbol = elements.tradeStockSelect.value;
+  const shares = Math.floor(Number(elements.tradeSharesInput.value));
+  if (!symbol || !Number.isFinite(shares) || shares <= 0) {
+    addLog("売買株数は1以上の整数で入力してください。");
+    render();
+    return;
+  }
+
+  const succeeded = type === "buy"
+    ? buyShares(symbol, shares, "手動買付")
+    : sellShares(symbol, shares, "手動売却");
+  if (succeeded) {
+    elements.tradeSharesInput.value = "";
+  }
+  checkGameEnd();
+  render();
+}
+
+function fillMaxShares(type) {
+  const stock = findStock(elements.tradeStockSelect.value);
+  if (!stock) return;
+
+  const maxShares = type === "buy" ? Math.floor(gameState.cash / stock.price) : stock.shares;
+  elements.tradeSharesInput.value = Math.max(0, maxShares);
+  renderTradePanel();
+}
+
 function render() {
   renderStatus();
   renderStocks();
+  renderTradePanel();
   renderHand();
   renderLogs();
   renderEffects();
@@ -678,6 +933,38 @@ function renderStocks() {
     `;
     elements.stockTableBody.appendChild(row);
   });
+}
+
+function renderTradePanel() {
+  const selectedSymbol = elements.tradeStockSelect.value || (gameState.stocks[0] && gameState.stocks[0].symbol);
+  elements.tradeStockSelect.innerHTML = "";
+
+  gameState.stocks.forEach((stock) => {
+    const option = document.createElement("option");
+    option.value = stock.symbol;
+    option.textContent = `${stock.name} / ${formatYen(stock.price)} / 保有 ${stock.shares}株`;
+    elements.tradeStockSelect.appendChild(option);
+  });
+
+  if (selectedSymbol) elements.tradeStockSelect.value = selectedSymbol;
+  const stock = findStock(elements.tradeStockSelect.value);
+  const disabled = !gameState.started || gameState.gameOver || !stock;
+  const maxBuy = stock ? Math.floor(gameState.cash / stock.price) : 0;
+  const maxSell = stock ? stock.shares : 0;
+
+  elements.buySharesButton.disabled = disabled || maxBuy <= 0;
+  elements.sellSharesButton.disabled = disabled || maxSell <= 0;
+  elements.maxBuyButton.disabled = disabled || maxBuy <= 0;
+  elements.maxSellButton.disabled = disabled || maxSell <= 0;
+  elements.tradeSharesInput.disabled = disabled;
+  elements.tradeStockSelect.disabled = disabled;
+
+  if (!stock) {
+    elements.tradeHint.textContent = "ゲーム開始後、株数を指定していつでも売買できます。";
+    return;
+  }
+
+  elements.tradeHint.textContent = `買付可能 ${maxBuy.toLocaleString("ja-JP")}株 / 売却可能 ${maxSell.toLocaleString("ja-JP")}株 / 平均取得 ${formatYen(stock.averageCost || 0)}`;
 }
 
 function renderHand() {
@@ -765,10 +1052,18 @@ function renderLogs() {
 }
 
 function renderEffects() {
+  const relicNames = gameState.relics
+    .map((relicId) => RELIC_DEFINITIONS.find((relic) => relic.id === relicId))
+    .filter(Boolean)
+    .map((relic) => relic.name)
+    .join(" / ");
   const badges = [
     { label: "信用取引", active: gameState.effects.margin },
     { label: `分散 ${gameState.effects.diversifyCharges}`, active: gameState.effects.diversifyCharges > 0 },
     { label: `暴落耐性 ${gameState.effects.crashGuards}`, active: gameState.effects.crashGuards > 0 },
+    { label: `倍率 ${gameState.effects.upsideBoostCharges}`, active: gameState.effects.upsideBoostCharges > 0 },
+    { label: `分岐 ${gameState.effects.marketChoiceCharges}`, active: gameState.effects.marketChoiceCharges > 0 },
+    { label: `レリック ${gameState.relics.length}${relicNames ? `: ${relicNames}` : ""}`, active: gameState.relics.length > 0 },
     { label: `山札 ${gameState.drawPile.length}`, active: false },
     { label: `捨札 ${gameState.discardPile.length}`, active: false },
     { label: `デッキ ${gameState.deck.length}`, active: false }
@@ -810,5 +1105,13 @@ elements.startButton.addEventListener("click", resetGame);
 elements.restartButton.addEventListener("click", resetGame);
 elements.resultRestartButton.addEventListener("click", resetGame);
 elements.endTurnButton.addEventListener("click", endTurn);
+elements.buySharesButton.addEventListener("click", () => executeManualTrade("buy"));
+elements.sellSharesButton.addEventListener("click", () => executeManualTrade("sell"));
+elements.maxBuyButton.addEventListener("click", () => fillMaxShares("buy"));
+elements.maxSellButton.addEventListener("click", () => fillMaxShares("sell"));
+elements.tradeStockSelect.addEventListener("change", renderTradePanel);
+elements.tradeSharesInput.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") executeManualTrade("buy");
+});
 
 render();
