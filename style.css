@@ -21,7 +21,7 @@
 
 body {
   margin: 0;
-  min-width: 1120px;
+  min-width: 1240px;
   background:
     linear-gradient(rgba(5, 7, 11, 0.78), rgba(5, 7, 11, 0.92)),
     url("assets/title_bg.png") center top / cover fixed no-repeat,
@@ -66,9 +66,10 @@ button:disabled {
 }
 
 .app-shell {
-  width: min(1440px, calc(100vw - 48px));
+  width: min(1480px, calc(100vw - 28px));
   margin: 0 auto;
-  padding: 28px 0 36px;
+  min-height: 100vh;
+  padding: 14px 0;
 }
 
 .topbar,
@@ -82,11 +83,11 @@ button:disabled {
 .topbar {
   justify-content: space-between;
   gap: 24px;
-  margin-bottom: 22px;
-  min-height: 176px;
+  margin-bottom: 12px;
+  min-height: 88px;
   border: 2px solid #6fbf6a;
   border-radius: 0;
-  padding: 24px;
+  padding: 16px 20px;
   overflow: hidden;
   position: relative;
   background:
@@ -116,7 +117,7 @@ button:disabled {
 
 .topbar h1 {
   color: #dfffe4;
-  font-size: 30px;
+  font-size: 24px;
   font-weight: 800;
   line-height: 1.15;
   text-shadow: 3px 3px 0 #06140a, 0 0 12px rgba(67, 227, 93, 0.72);
@@ -161,29 +162,29 @@ button:disabled {
 .status-grid {
   display: grid;
   grid-template-columns: repeat(6, 1fr);
-  gap: 16px;
-  margin-bottom: 22px;
+  gap: 10px;
+  margin-bottom: 12px;
 }
 
 .metric {
-  min-height: 86px;
+  min-height: 64px;
   border: 2px solid var(--line);
   border-radius: 0;
-  padding: 16px;
+  padding: 10px 12px;
   background: rgba(8, 13, 19, 0.96);
   box-shadow: var(--shadow);
 }
 
 .metric span {
   display: block;
-  margin-bottom: 10px;
+  margin-bottom: 6px;
   color: var(--yellow);
   font-size: 13px;
   text-shadow: 2px 2px 0 #05070b;
 }
 
 .metric strong {
-  font-size: 25px;
+  font-size: 19px;
   font-variant-numeric: tabular-nums;
   text-shadow: 2px 2px 0 #05070b;
 }
@@ -195,12 +196,12 @@ button:disabled {
 
 .game-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 360px;
+  grid-template-columns: 330px minmax(520px, 1fr) 330px;
   grid-template-areas:
-    "market log"
-    "trade log"
-    "hand log";
-  gap: 22px;
+    "stage market log"
+    "trade hand log";
+  grid-template-rows: minmax(250px, auto) minmax(330px, 1fr);
+  gap: 12px;
   align-items: start;
 }
 
@@ -212,7 +213,8 @@ button:disabled {
 }
 
 .stage-panel {
-  margin-bottom: 22px;
+  grid-area: stage;
+  margin-bottom: 0;
 }
 
 .boss-name {
@@ -245,9 +247,9 @@ button:disabled {
 
 .stage-grid {
   display: grid;
-  grid-template-columns: minmax(280px, 1.4fr) repeat(2, minmax(180px, 0.8fr));
-  gap: 14px;
-  padding: 18px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding: 12px;
 }
 
 .boss-hp-block,
@@ -260,7 +262,7 @@ button:disabled {
 }
 
 .boss-hp-block {
-  grid-column: span 1;
+  grid-column: 1 / -1;
 }
 
 .boss-hp-row {
@@ -295,12 +297,13 @@ button:disabled {
 }
 
 .omen-box {
-  grid-column: 1 / span 2;
+  grid-column: 1 / -1;
   display: grid;
   gap: 8px;
 }
 
 .passive-box {
+  grid-column: 1 / -1;
   display: grid;
   gap: 8px;
 }
@@ -336,20 +339,21 @@ button:disabled {
 
 .log-panel {
   grid-area: log;
-  min-height: 610px;
+  height: 100%;
+  min-height: 592px;
 }
 
 .panel-header {
   justify-content: space-between;
   gap: 16px;
-  padding: 16px 18px;
+  padding: 12px 14px;
   border-bottom: 2px solid var(--line);
   background: #101a24;
 }
 
 .panel h2,
 .modal-card h2 {
-  font-size: 20px;
+  font-size: 18px;
   color: #f4fff0;
   text-shadow: 2px 2px 0 #05070b;
 }
@@ -385,7 +389,7 @@ button:disabled {
 
 .stock-table th,
 .stock-table td {
-  padding: 16px 18px;
+  padding: 12px 12px;
   border-bottom: 2px solid rgba(74, 90, 97, 0.58);
   text-align: right;
   font-variant-numeric: tabular-nums;
@@ -429,9 +433,9 @@ button:disabled {
 }
 
 .stock-icon {
-  width: 64px;
-  height: 64px;
-  flex: 0 0 64px;
+  width: 52px;
+  height: 52px;
+  flex: 0 0 52px;
   border: 2px solid rgba(159, 176, 173, 0.82);
   border-radius: 0;
   background: #05070b;
@@ -457,11 +461,15 @@ button:disabled {
 
 .trade-form {
   display: grid;
-  grid-template-columns: minmax(180px, 1fr) minmax(160px, 220px) auto;
-  gap: 14px;
+  grid-template-columns: 1fr;
+  gap: 10px;
   align-items: end;
-  padding: 18px;
+  padding: 12px;
   background: rgba(5, 9, 13, 0.56);
+}
+
+.stock-select-field {
+  display: none;
 }
 
 .trade-form label {
@@ -490,8 +498,8 @@ button:disabled {
 
 .trade-buttons {
   display: grid;
-  grid-template-columns: repeat(4, minmax(92px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
 }
 
 .trade-buttons button {
@@ -542,10 +550,10 @@ button:disabled {
 .log-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  max-height: 690px;
+  gap: 8px;
+  max-height: 650px;
   overflow: auto;
-  padding: 16px;
+  padding: 12px;
   scrollbar-color: var(--green) #05070b;
 }
 
@@ -553,10 +561,10 @@ button:disabled {
   border: 2px solid var(--line);
   border-left-color: var(--blue);
   border-radius: 0;
-  padding: 10px 12px;
+  padding: 8px 10px;
   background: #0a121a;
   color: #d6e7df;
-  font-size: 13px;
+  font-size: 12px;
   line-height: 1.55;
 }
 
@@ -568,18 +576,18 @@ button:disabled {
 .reward-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
-  padding: 18px;
+  gap: 10px;
+  padding: 12px;
 }
 
 .card {
   position: relative;
   display: flex;
   flex-direction: column;
-  min-height: 330px;
+  min-height: 260px;
   border: 0;
   border-radius: 0;
-  padding: 30px 22px 24px;
+  padding: 24px 18px 18px;
   overflow: hidden;
   background-color: #0b1018;
   background-position: center;
@@ -643,7 +651,7 @@ button:disabled {
 
 .card h3 {
   margin: 0;
-  font-size: 18px;
+  font-size: 16px;
   line-height: 1.25;
   color: #fbfff3;
 }
@@ -670,7 +678,8 @@ button:disabled {
 .card p {
   margin: 0 0 12px;
   color: #dce7d8;
-  line-height: 1.55;
+  font-size: 13px;
+  line-height: 1.45;
 }
 
 .card select {

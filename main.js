@@ -8,29 +8,23 @@ const MAX_CARDS_PER_TURN = 2;
 const TRANSACTION_FEE_RATE = 0.001;
 
 const STOCK_TEMPLATES = [
-  { symbol: "TECH", name: "TechNova", type: "成長株", price: 10000, note: "上昇しやすいが下落も大きい" },
-  { symbol: "CARE", name: "CareLink", type: "介護テック株", price: 5000, note: "安定成長" },
-  { symbol: "GAME", name: "GameForge", type: "ゲーム株", price: 8000, note: "イベントによる変動が大きい" },
-  { symbol: "GREEN", name: "GreenEnergy", type: "テーマ株", price: 3000, note: "ニュースカードの影響を受けやすい" }
+  { symbol: "TECH", name: "TechNova", type: "成長株", price: 10000, note: "唯一の取引対象。ボス予兆を読んで売買する" }
 ];
 
 const STOCK_ICONS = {
-  TECH: "assets/icon_technova.png",
-  CARE: "assets/icon_carelink.png",
-  GAME: "assets/icon_gameforge.png",
-  GREEN: "assets/icon_greenenergy.png"
+  TECH: "assets/icon_technova.png"
 };
 
 const MARKET_EVENTS = [
   {
-    name: "全体相場上昇",
-    description: "全銘柄 +10%",
-    changes: { TECH: 0.10, CARE: 0.10, GAME: 0.10, GREEN: 0.10 }
+    name: "地合い改善",
+    description: "TechNova +10%",
+    changes: { TECH: 0.10 }
   },
   {
-    name: "全体相場下落",
-    description: "全銘柄 -10%",
-    changes: { TECH: -0.10, CARE: -0.10, GAME: -0.10, GREEN: -0.10 }
+    name: "地合い悪化",
+    description: "TechNova -10%",
+    changes: { TECH: -0.10 }
   },
   {
     name: "AIブーム",
@@ -38,29 +32,29 @@ const MARKET_EVENTS = [
     changes: { TECH: 0.20 }
   },
   {
-    name: "介護人材不足ニュース",
-    description: "CareLink +20%",
-    changes: { CARE: 0.20 }
+    name: "大型契約観測",
+    description: "TechNova +18%",
+    changes: { TECH: 0.18 }
   },
   {
-    name: "新作ゲーム爆死",
-    description: "GameForge -25%",
-    changes: { GAME: -0.25 }
+    name: "製品延期",
+    description: "TechNova -22%",
+    changes: { TECH: -0.22 }
   },
   {
-    name: "補助金発表",
-    description: "GreenEnergy +25%",
-    changes: { GREEN: 0.25 }
+    name: "補助金採択",
+    description: "TechNova +25%",
+    changes: { TECH: 0.25 }
   },
   {
-    name: "円安進行",
-    description: "GameForge +10%",
-    changes: { GAME: 0.10 }
+    name: "円安追い風",
+    description: "TechNova +10%",
+    changes: { TECH: 0.10 }
   },
   {
     name: "景気後退",
-    description: "全銘柄 -15%",
-    changes: { TECH: -0.15, CARE: -0.15, GAME: -0.15, GREEN: -0.15 }
+    description: "TechNova -15%",
+    changes: { TECH: -0.15 }
   }
 ];
 
@@ -120,8 +114,8 @@ const PASSIVE_DEFINITIONS = {
   },
   diversifiedInvestor: {
     id: "diversifiedInvestor",
-    name: "分散投資家",
-    description: "3銘柄以上保有している場合、下落イベントの影響を20%軽減する。"
+    name: "資金管理家",
+    description: "現金比率が30%以上ある場合、下落イベントの影響を20%軽減する。"
   },
   contrarian: {
     id: "contrarian",
@@ -136,7 +130,7 @@ const PASSIVE_DEFINITIONS = {
   infoNetwork: {
     id: "infoNetwork",
     name: "情報網",
-    description: "ボス対象銘柄が1ターン早くわかる。"
+    description: "ボスイベントの方向性が1ターン早くわかる。"
   },
   longTerm: {
     id: "longTerm",
@@ -236,8 +230,8 @@ const CARD_DEFINITIONS = {
     name: "SNS炎上",
     rarity: "Rare",
     category: "ニュース",
-    description: "GameForgeまたはTechNovaの株価を30%下落させる。",
-    target: ["TECH", "GAME"],
+    description: "TechNovaの株価を30%下落させる。",
+    target: "all",
     use(target) {
       applyPriceChanges({ [target]: -0.30 }, "SNS炎上");
     }
@@ -247,8 +241,8 @@ const CARD_DEFINITIONS = {
     name: "国策テーマ化",
     rarity: "Rare",
     category: "ニュース",
-    description: "GreenEnergyまたはCareLinkの株価を30%上昇させる。",
-    target: ["GREEN", "CARE"],
+    description: "TechNovaの株価を30%上昇させる。",
+    target: "all",
     use(target) {
       applyPriceChanges({ [target]: 0.30 }, "国策テーマ化");
     }
@@ -692,19 +686,17 @@ function setupStage(stageIndex) {
 
 function createBossPlan(stageIndex) {
   if (stageIndex === 0) {
-    const target = randomItem(gameState.stocks).symbol;
     const positive = Math.random() < 0.58;
-    return { target, positive, rebound: null };
+    return { target: "TECH", positive, rebound: null };
   }
   if (stageIndex === 1) {
-    const target = randomItem(["TECH", "GAME"]);
     const positive = Math.random() < 0.52;
-    return { target, positive, rebound: null };
+    return { target: "TECH", positive, rebound: null };
   }
   if (stageIndex === 4) {
-    return { target: null, positive: false, rebound: randomItem(gameState.stocks).symbol };
+    return { target: "TECH", positive: false, rebound: "TECH" };
   }
-  return { target: null, positive: false, rebound: null };
+  return { target: "TECH", positive: false, rebound: null };
 }
 
 function createStageStartOmen() {
@@ -751,29 +743,25 @@ function createBossOmen() {
     const mood = plan.positive ? "熱狂的な拡散" : "炎上の火種";
     return precise
       ? `SNSトレンドは ${stock.name} に集中。内容は「${mood}」。`
-      : `TechNovaかGameForgeにSNS相場の気配。中心は ${stock.name} かもしれない。`;
+      : `${stock.name} にSNS相場の気配。内容は「${mood}」かもしれない。`;
   }
   if (stageIndex === 2) {
-    const currentTarget = getLargestHoldingSymbol();
-    return precise && currentTarget
-      ? `空売りファンドは現在の最大保有 ${findStock(currentTarget).name} を狙っている。3銘柄以上なら圧力は軽くなる。`
-      : "空売りファンドが集中ポジションを監視している。1銘柄集中は危険。";
+    return precise
+      ? "空売りファンドはTechNovaの過大ポジションを狙っている。現金比率25%以上なら圧力は軽くなる。"
+      : "空売りファンドが信用残と過大ポジションを監視している。現金を残すほど安全。";
   }
   if (stageIndex === 3) {
     return precise
-      ? "中央銀行はTechNovaに強い下落圧力。CareLinkは比較的守りやすい。信用取引中の下落は重くなる。"
+      ? "中央銀行はTechNovaに強い下落圧力。現金比率35%以上ならショック後の買い余力として評価される。"
       : "金融引き締めの予兆。成長株と信用取引に警戒。";
   }
-  const rebound = findStock(plan.rebound);
   return precise
-    ? `ブラックマンデーの後、${rebound.name} に大反発の買いが入りそう。`
-    : `全面暴落の予兆。ただし ${rebound.type} 周辺に反発資金が向かう気配。`;
+    ? "ブラックマンデー後、TechNovaに大反発の買いが入りそう。暴落前の現金と暴落耐性が鍵。"
+    : "全面暴落の予兆。ただし暴落後に強い反発資金が向かう気配。";
 }
 
 function getKnownBossTarget() {
   if (!gameState.bossPlan) return null;
-  if (gameState.stageIndex === 2) return getLargestHoldingSymbol();
-  if (gameState.stageIndex === 4) return gameState.bossPlan.rebound;
   return gameState.bossPlan.target;
 }
 
@@ -799,10 +787,9 @@ function resolveStageTurnEvent() {
 
 function resolveStagePressure() {
   if (gameState.stageIndex === 1 && gameState.stageTurn < STAGE_TURNS) {
-    const techMove = randomItem([-0.08, 0.08]);
-    const gameMove = randomItem([-0.10, 0.10]);
-    addLog("SNS相場のボラティリティ上昇: TechNovaとGameForgeが荒い値動き。");
-    applyPriceChanges({ TECH: techMove, GAME: gameMove }, "SNSボラティリティ");
+    const techMove = randomItem([-0.12, -0.08, 0.08, 0.12]);
+    addLog("SNS相場のボラティリティ上昇: TechNovaが荒い値動き。");
+    applyPriceChanges({ TECH: techMove }, "SNSボラティリティ");
     return;
   }
 
@@ -829,27 +816,28 @@ function resolveBossEvent() {
   }
 
   if (gameState.stageIndex === 2) {
-    const target = getLargestHoldingSymbol() || randomItem(gameState.stocks).symbol;
-    const diversified = countHeldStocks() >= 3;
-    applyPriceChanges({ [target]: diversified ? -0.10 : -0.25 }, diversified ? "分散で軽減した空売り" : "空売りファンドの集中攻撃");
-    if (diversified) addBonusDamage(Math.floor(getCurrentStage().hp * 0.40), "分散包囲ボーナス");
+    const cashCushion = getCashRatio() >= 0.25;
+    applyPriceChanges({ TECH: cashCushion ? -0.10 : -0.25 }, cashCushion ? "現金余力で軽減した空売り" : "空売りファンドの集中攻撃");
+    if (cashCushion) addBonusDamage(Math.floor(getCurrentStage().hp * 0.40), "現金余力ボーナス");
     return;
   }
 
   if (gameState.stageIndex === 3) {
-    applyPriceChanges({ TECH: -0.25, GAME: -0.15, GREEN: -0.15, CARE: -0.05 }, "中央銀行ショック");
-    const techExposure = calculateStockExposure("TECH");
-    const careExposure = calculateStockExposure("CARE");
-    if (techExposure < 0.15 && careExposure > 0) {
+    applyPriceChanges({ TECH: -0.28 }, "中央銀行ショック");
+    if (getCashRatio() >= 0.35) {
       addBonusDamage(Math.floor(getCurrentStage().hp * 0.35), "金融引き締め対応ボーナス");
     }
     return;
   }
 
-  applyPriceChanges({ TECH: -0.30, CARE: -0.30, GAME: -0.30, GREEN: -0.30 }, "ブラックマンデー暴落");
-  applyPriceChanges({ [plan.rebound]: 0.50 }, "暴落後の大反発");
-  if (findStock(plan.rebound).shares > 0) {
-    addBonusDamage(Math.floor(findStock(plan.rebound).shares * findStock(plan.rebound).price * 0.35), "大反発キャッチボーナス");
+  const cashBeforeCrash = getCashRatio();
+  applyPriceChanges({ TECH: -0.30 }, "ブラックマンデー暴落");
+  applyPriceChanges({ TECH: 0.50 }, "暴落後の大反発");
+  if (findStock("TECH").shares > 0) {
+    addBonusDamage(Math.floor(findStock("TECH").shares * findStock("TECH").price * 0.35), "大反発キャッチボーナス");
+  }
+  if (cashBeforeCrash >= 0.40) {
+    addBonusDamage(Math.floor(getCurrentStage().hp * 0.25), "暴落待機ボーナス");
   }
 }
 
@@ -868,7 +856,14 @@ function calculateStockExposure(symbol) {
   const total = calculateTotalAssets();
   if (total <= 0) return 0;
   const stock = findStock(symbol);
+  if (!stock) return 0;
   return (stock.price * stock.shares) / total;
+}
+
+function getCashRatio() {
+  const total = calculateTotalAssets();
+  if (total <= 0) return 0;
+  return gameState.cash / total;
 }
 
 function addBonusDamage(amount, label) {
@@ -903,7 +898,7 @@ function resolveBossDamage() {
     gameState.stageDamage += damage;
     gameState.lastOverkill = Math.max(0, damage - hpBefore);
     if (concentrationPenalty < 1) {
-      addLog("集中リスク: 1銘柄偏重のためボスへのダメージ効率が25%低下。");
+      addLog("ポジション過大: 総資産の70%超を株で持っているため、ボスへのダメージ効率が25%低下。");
     }
     addLog(`利益 ${formatYen(baseDamage)} × COMBO ${multiplier.toFixed(2)} + 読み切り ${formatYen(bonusDamage)} = <strong>${formatYen(damage)}</strong> ダメージ。残HP ${formatYen(gameState.bossHp)}。`);
     triggerImpact(`${formatYen(damage)} DAMAGE`, "damage");
@@ -1096,6 +1091,7 @@ function applyPriceChanges(changes, source) {
 
   Object.entries(adjustedChanges).forEach(([symbol, percent]) => {
     const stock = findStock(symbol);
+    if (!stock) return;
     const leverage = gameState.effects.margin && stock.shares > 0 ? getMarginMultiplier(percent) : 1;
     const leveragedPercent = percent * leverage;
     const oldPrice = stock.price;
@@ -1158,8 +1154,8 @@ function adjustDownside(changes, source) {
     );
   }
 
-  if (hasPassive("diversifiedInvestor") && countHeldStocks() >= 3) {
-    addLog(`分散投資家: 3銘柄以上保有により、${source} の下落影響を20%軽減。`);
+  if (hasPassive("diversifiedInvestor") && getCashRatio() >= 0.30) {
+    addLog(`資金管理家: 現金比率30%以上により、${source} の下落影響を20%軽減。`);
     changes = Object.fromEntries(
       Object.entries(changes).map(([symbol, percent]) => [symbol, percent < 0 ? percent * 0.8 : percent])
     );
@@ -1670,7 +1666,7 @@ function createCardElement(card, options) {
   `;
 
   let select = null;
-  if (isTargetCard) {
+  if (isTargetCard && targets.length > 1) {
     select = document.createElement("select");
     targets.forEach((stock) => {
       const option = document.createElement("option");
@@ -1694,7 +1690,8 @@ function createCardElement(card, options) {
       options.onClick();
       return;
     }
-    options.onClick(options.instanceId, select ? select.value : null);
+    const target = select ? select.value : targets[0] ? targets[0].symbol : null;
+    options.onClick(options.instanceId, target);
   });
   element.appendChild(button);
 
@@ -1724,14 +1721,14 @@ function renderEffects() {
     .filter(Boolean)
     .map((relic) => relic.name)
     .join(" / ");
-  const concentration = Math.round(getLargestHoldingExposure() * 100);
+  const positionRate = Math.round(getLargestHoldingExposure() * 100);
   const badges = [
     { label: "信用取引", active: gameState.effects.margin },
     { label: `分散 ${gameState.effects.diversifyCharges}`, active: gameState.effects.diversifyCharges > 0 },
     { label: `暴落耐性 ${gameState.effects.crashGuards}`, active: gameState.effects.crashGuards > 0 },
     { label: `倍率 ${gameState.effects.upsideBoostCharges}`, active: gameState.effects.upsideBoostCharges > 0 },
     { label: `分岐 ${gameState.effects.marketChoiceCharges}`, active: gameState.effects.marketChoiceCharges > 0 },
-    { label: `集中 ${concentration}%`, active: concentration > 70 },
+    { label: `ポジション ${positionRate}%`, active: positionRate > 70 },
     { label: `パッシブ ${gameState.passives.length}`, active: gameState.passives.length > 0 },
     { label: `レリック ${gameState.relics.length}${relicNames ? `: ${relicNames}` : ""}`, active: gameState.relics.length > 0 },
     { label: `山札 ${gameState.drawPile.length}`, active: false },
