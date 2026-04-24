@@ -63,6 +63,7 @@ const STAGES = [
     name: "決算の門番",
     theme: "決算発表",
     hp: 100000,
+    guard: 20000,
     cashBonus: 50000,
     marketMultiplier: 1,
     bossName: "決算の門番"
@@ -71,6 +72,7 @@ const STAGES = [
     name: "炎上インフルエンサー",
     theme: "SNS相場",
     hp: 180000,
+    guard: 35000,
     cashBonus: 80000,
     marketMultiplier: 1.1,
     bossName: "炎上インフルエンサー"
@@ -79,6 +81,7 @@ const STAGES = [
     name: "空売りファンド",
     theme: "機関投資家",
     hp: 280000,
+    guard: 55000,
     cashBonus: 120000,
     marketMultiplier: 1.2,
     bossName: "空売りファンド"
@@ -87,6 +90,7 @@ const STAGES = [
     name: "中央銀行",
     theme: "金融引き締め",
     hp: 400000,
+    guard: 85000,
     cashBonus: 180000,
     marketMultiplier: 1.35,
     bossName: "中央銀行"
@@ -95,6 +99,7 @@ const STAGES = [
     name: "ブラックマンデー",
     theme: "市場暴落",
     hp: 600000,
+    guard: 120000,
     cashBonus: 0,
     marketMultiplier: 1.5,
     bossName: "ブラックマンデー"
@@ -391,6 +396,17 @@ const CARD_DEFINITIONS = {
       gameState.effects.marketChoiceCharges += 1;
       addLog("分岐ルートを確保。次の市場イベントは2候補から有利な方を選びます。");
     }
+  },
+  curse: {
+    id: "curse",
+    name: "塩漬けポジション",
+    rarity: "Common",
+    category: "呪い",
+    description: "何も起きない。使用するとカード使用回数だけ消費する。",
+    target: "none",
+    use() {
+      addLog("塩漬けポジション: 何も起きませんでした。");
+    }
   }
 };
 
@@ -429,6 +445,39 @@ const REWARD_POOL = [
   "marketBranch"
 ];
 
+const ROUTE_DEFINITIONS = {
+  volatile: {
+    id: "volatile",
+    name: "高ボラ迷宮",
+    description: "市場イベントが激しくなる。毎ターン+1ドロー。ボスガードも増える。",
+    marketBonus: 0.35,
+    drawBonus: 1,
+    guardBonus: 30000
+  },
+  elite: {
+    id: "elite",
+    name: "エリート取引所",
+    description: "ボスHPとガードが増えるが、次のステージ開始時に現金15万円を得る。",
+    hpMultiplier: 1.18,
+    guardBonus: 45000,
+    startCash: 150000
+  },
+  safe: {
+    id: "safe",
+    name: "避難市場",
+    description: "各ターン開始時に下落半減を1回得る。ボスHPは少し増える。",
+    hpMultiplier: 1.08,
+    freeHedge: true
+  },
+  cursed: {
+    id: "cursed",
+    name: "呪いの資金調達",
+    description: "現金25万円を得るが、デッキに呪いカードが2枚混ざる。",
+    startCash: 250000,
+    curseCards: 2
+  }
+};
+
 const gameState = {
   started: false,
   gameOver: false,
@@ -448,9 +497,12 @@ const gameState = {
   bossPlan: null,
   currentOmen: "ゲーム開始後に表示されます。",
   priceHistory: [],
+  currentRoute: null,
+  nextRoute: null,
   pendingReward: null,
   selectedRewardCard: null,
   selectedRewardPassive: null,
+  selectedRewardRoute: null,
   stageRiskUsed: false,
   cash: INITIAL_CASH,
   stocks: [],
@@ -485,8 +537,10 @@ const elements = {
   stageText: document.getElementById("stageText"),
   stageTurnText: document.getElementById("stageTurnText"),
   stageNameText: document.getElementById("stageNameText"),
+  routeText: document.getElementById("routeText"),
   bossNameText: document.getElementById("bossNameText"),
   bossHpText: document.getElementById("bossHpText"),
+  bossGuardText: document.getElementById("bossGuardText"),
   bossHpFill: document.getElementById("bossHpFill"),
   stageStartText: document.getElementById("stageStartText"),
   stageProfitText: document.getElementById("stageProfitText"),
@@ -519,6 +573,7 @@ const elements = {
   rewardCashText: document.getElementById("rewardCashText"),
   rewardCards: document.getElementById("rewardCards"),
   passiveRewards: document.getElementById("passiveRewards"),
+  routeRewards: document.getElementById("routeRewards"),
   confirmRewardButton: document.getElementById("confirmRewardButton"),
   resultModal: document.getElementById("resultModal"),
   resultLabel: document.getElementById("resultLabel"),
@@ -568,6 +623,9 @@ function resetGame() {
   gameState.pendingReward = null;
   gameState.selectedRewardCard = null;
   gameState.selectedRewardPassive = null;
+  gameState.selectedRewardRoute = null;
+  gameState.currentRoute = null;
+  gameState.nextRoute = null;
   gameState.stageRiskUsed = false;
   gameState.priceHistory = [];
   gameState.logs = [];
@@ -586,12 +644,16 @@ function startTurn() {
   gameState.playedThisTurn = 0;
   gameState.effects.margin = false;
   prepareStageTurnOmen();
+  if (getCurrentRoute().freeHedge) {
+    gameState.effects.diversifyCharges += 1;
+    addLog(`ルート「${getCurrentRoute().name}」: このターンの下落半減を1回獲得。`);
+  }
   if (hasRelic("riskMeter")) {
     gameState.effects.diversifyCharges += 1;
     addLog("レリック「リスク計量器」: このターンの下落半減を1回獲得。");
   }
   const relicDrawBonus = hasRelic("tradingTerminal") ? 1 : 0;
-  const drawCount = 3 + gameState.nextDrawBonus + relicDrawBonus;
+  const drawCount = 3 + gameState.nextDrawBonus + relicDrawBonus + (getCurrentRoute().drawBonus || 0);
   gameState.nextDrawBonus = 0;
   drawCards(drawCount);
   addLog(`<strong>Stage ${gameState.stageIndex + 1}-${gameState.stageTurn}</strong> 開始。手札を${drawCount}枚引きました。`);
@@ -680,8 +742,13 @@ function endTurn() {
 
 function setupStage(stageIndex) {
   const stage = STAGES[stageIndex];
+  gameState.currentRoute = gameState.nextRoute;
+  gameState.nextRoute = null;
+  const route = getCurrentRoute();
   gameState.stageIndex = stageIndex;
   gameState.stageTurn = 1;
+  gameState.stageRiskUsed = false;
+  applyRouteStartEffects(route);
   gameState.stageStartAssets = calculateTotalAssets();
   gameState.lastTurnAssets = gameState.stageStartAssets;
   gameState.stageDamage = 0;
@@ -689,12 +756,32 @@ function setupStage(stageIndex) {
   gameState.bonusDamageThisTurn = 0;
   gameState.damageCombo = 0;
   gameState.lastOverkill = 0;
-  gameState.bossHp = stage.hp;
-  gameState.bossMaxHp = stage.hp;
+  gameState.bossHp = Math.floor(stage.hp * (route.hpMultiplier || 1));
+  gameState.bossMaxHp = gameState.bossHp;
   gameState.bossPlan = createBossPlan(stageIndex);
   gameState.currentOmen = createStageStartOmen();
-  gameState.stageRiskUsed = false;
   addLog(`<strong>Stage ${stageIndex + 1}: ${stage.name}</strong> 開始。テーマ: ${stage.theme} / ボスHP ${formatYen(stage.hp)}。`);
+}
+
+function getCurrentRoute() {
+  return gameState.currentRoute ? ROUTE_DEFINITIONS[gameState.currentRoute] : {};
+}
+
+function applyRouteStartEffects(route) {
+  if (!route || !route.id) return;
+  addLog(`ルート突入: <strong>${route.name}</strong> - ${route.description}`);
+  if (route.startCash) {
+    gameState.cash += route.startCash;
+    addLog(`ルート報酬: 現金 ${formatYen(route.startCash)} を獲得。`);
+  }
+  if (route.curseCards) {
+    for (let i = 0; i < route.curseCards; i += 1) {
+      const curse = createCardInstance("curse");
+      gameState.deck.push(curse);
+      gameState.discardPile.push(curse);
+    }
+    addLog(`ルート代償: 呪いカード「塩漬けポジション」が${route.curseCards}枚デッキに混入。`);
+  }
 }
 
 function createBossPlan(stageIndex) {
@@ -787,7 +874,7 @@ function resolveStageTurnEvent() {
   if (gameState.stageTurn === 1) {
     const event = selectMarketEvent();
     addLog(`市場イベント: <strong>${event.name}</strong> - ${event.description}`);
-    applyPriceChanges(scaleChanges(event.changes, getCurrentStage().marketMultiplier), event.name);
+    applyPriceChanges(scaleChanges(event.changes, getStageMarketMultiplier()), event.name);
     resolveStagePressure();
     return;
   }
@@ -801,7 +888,7 @@ function resolveStageTurnEvent() {
   if (gameState.stageTurn < STAGE_TURNS) {
     const event = selectMarketEvent();
     addLog(`調整ターン市場: <strong>${event.name}</strong> - ${event.description}`);
-    applyPriceChanges(scaleChanges(event.changes, getCurrentStage().marketMultiplier * 0.65), event.name);
+    applyPriceChanges(scaleChanges(event.changes, getStageMarketMultiplier() * 0.65), event.name);
     resolveStagePressure();
     return;
   }
@@ -917,7 +1004,9 @@ function resolveBossDamage() {
     const concentrationRate = getLargestHoldingExposure();
     const concentrationPenalty = gameState.stageIndex >= 1 && concentrationRate > 0.7 ? 0.75 : 1;
     const rawDamage = Math.floor(baseDamage * multiplier) + bonusDamage;
-    const damage = Math.floor(rawDamage * concentrationPenalty);
+    const guard = getBossGuard();
+    const guardedDamage = Math.max(0, rawDamage - guard);
+    const damage = Math.floor(guardedDamage * concentrationPenalty);
     const hpBefore = gameState.bossHp;
     gameState.bossHp = Math.max(0, gameState.bossHp - damage);
     gameState.lastDamage = damage;
@@ -926,8 +1015,11 @@ function resolveBossDamage() {
     if (concentrationPenalty < 1) {
       addLog("ポジション過大: 総資産の70%超を建てているため、ボスへのダメージ効率が25%低下。");
     }
-    addLog(`利益 ${formatYen(baseDamage)} × COMBO ${multiplier.toFixed(2)} + 読み切り ${formatYen(bonusDamage)} = <strong>${formatYen(damage)}</strong> ダメージ。残HP ${formatYen(gameState.bossHp)}。`);
-    triggerImpact(`${formatYen(damage)} DAMAGE`, "damage");
+    if (rawDamage > 0 && guardedDamage <= 0) {
+      addLog(`ボスガード: 小さい利益 ${formatYen(rawDamage)} はガード ${formatYen(guard)} に吸収されました。`);
+    }
+    addLog(`利益 ${formatYen(baseDamage)} × COMBO ${multiplier.toFixed(2)} + 読み切り ${formatYen(bonusDamage)} - ガード ${formatYen(guard)} = <strong>${formatYen(damage)}</strong> ダメージ。残HP ${formatYen(gameState.bossHp)}。`);
+    triggerImpact(damage > 0 ? `${formatYen(damage)} DAMAGE` : "GUARDED", damage > 0 ? "damage" : "miss");
     pulseElement(elements.bossHpFill, "hit");
   } else {
     gameState.damageCombo = 0;
@@ -983,7 +1075,7 @@ function resolveStageEnd() {
 }
 
 function confirmStageReward() {
-  if (!gameState.pendingReward || !gameState.selectedRewardCard || !gameState.selectedRewardPassive) return;
+  if (!gameState.pendingReward || !gameState.selectedRewardCard || !gameState.selectedRewardPassive || !gameState.selectedRewardRoute) return;
 
   const newCard = createCardInstance(gameState.selectedRewardCard);
   gameState.deck.push(newCard);
@@ -993,12 +1085,15 @@ function confirmStageReward() {
   }
   const overkillBonus = Math.min(Math.floor(gameState.lastOverkill * 0.15), getCurrentStage().hp);
   gameState.cash += gameState.pendingReward.cashBonus + overkillBonus;
-  addLog(`報酬: ${CARD_DEFINITIONS[gameState.selectedRewardCard].name} / ${PASSIVE_DEFINITIONS[gameState.selectedRewardPassive].name} / 現金 ${formatYen(gameState.pendingReward.cashBonus)} / オーバーキル ${formatYen(overkillBonus)} を獲得。`);
+  const selectedRoute = gameState.selectedRewardRoute;
+  addLog(`報酬: ${CARD_DEFINITIONS[gameState.selectedRewardCard].name} / ${PASSIVE_DEFINITIONS[gameState.selectedRewardPassive].name} / 次ルート ${ROUTE_DEFINITIONS[selectedRoute].name} / 現金 ${formatYen(gameState.pendingReward.cashBonus)} / オーバーキル ${formatYen(overkillBonus)} を獲得。`);
 
   gameState.waitingForReward = false;
   gameState.pendingReward = null;
   gameState.selectedRewardCard = null;
   gameState.selectedRewardPassive = null;
+  gameState.nextRoute = selectedRoute;
+  gameState.selectedRewardRoute = null;
   elements.rewardModal.classList.add("hidden");
   gameState.stageIndex += 1;
   gameState.turn += 1;
@@ -1022,7 +1117,7 @@ function buyShares(symbol, sharesToBuy, source = "買付") {
   }
 
   if (sharesToBuy <= 0) {
-    addLog(`${stock.name}を購入する現金が不足しています。`);
+    addLog("購入する現金が不足しています。");
     return false;
   }
 
@@ -1064,26 +1159,32 @@ function sellShares(symbol, sharesToSell, source = "売却") {
 
   const subtotal = sharesToSell * stock.price;
   const fee = calculateTradeFee(subtotal);
-  const revenue = subtotal - fee;
+  const realizedProfit = Math.max(0, (stock.price - stock.averageCost) * sharesToSell);
+  const profitTax = Math.floor(realizedProfit * getProfitTaxRate());
+  const revenue = subtotal - fee - profitTax;
   stock.shares -= sharesToSell;
   if (stock.shares === 0) {
     stock.averageCost = 0;
     stock.holdingTurns = 0;
   }
   gameState.cash += revenue;
-  addLog(`${source}: ${sharesToSell}口売却。受取 ${formatYen(revenue)} / 手数料 ${formatYen(fee)}。`);
+  addLog(`${source}: ${sharesToSell}口売却。受取 ${formatYen(revenue)} / 手数料 ${formatYen(fee)} / 短期利確税 ${formatYen(profitTax)}。`);
   triggerImpact(`SELL ${stock.name}`, "trade");
   return true;
 }
 
 function calculateTradeFee(amount) {
-  const rate = hasPassive("feeCut") ? TRANSACTION_FEE_RATE / 2 : TRANSACTION_FEE_RATE;
+  const rate = (hasPassive("feeCut") ? TRANSACTION_FEE_RATE / 2 : TRANSACTION_FEE_RATE) * (getCurrentRoute().feeMultiplier || 1);
   return Math.ceil(amount * rate);
 }
 
 function calculateMaxBuyShares(price) {
-  const rate = hasPassive("feeCut") ? TRANSACTION_FEE_RATE / 2 : TRANSACTION_FEE_RATE;
+  const rate = (hasPassive("feeCut") ? TRANSACTION_FEE_RATE / 2 : TRANSACTION_FEE_RATE) * (getCurrentRoute().feeMultiplier || 1);
   return Math.floor(gameState.cash / (price * (1 + rate)));
+}
+
+function getProfitTaxRate() {
+  return hasPassive("feeCut") ? 0.08 : 0.15;
 }
 
 function improveAverageCost(symbol, improvementRate) {
@@ -1305,6 +1406,14 @@ function getCurrentStage() {
   return STAGES[gameState.stageIndex] || STAGES[0];
 }
 
+function getStageMarketMultiplier() {
+  return getCurrentStage().marketMultiplier + (getCurrentRoute().marketBonus || 0);
+}
+
+function getBossGuard() {
+  return getCurrentStage().guard + (getCurrentRoute().guardBonus || 0);
+}
+
 function countHeldStocks() {
   return gameState.stocks.filter((stock) => stock.shares > 0).length;
 }
@@ -1379,10 +1488,12 @@ function removeCardInstanceFromDeck(instanceId) {
 function showRewards() {
   const rewards = drawRewardChoices();
   const passiveChoices = drawPassiveChoices();
+  const routeChoices = drawRouteChoices();
   const cashBonus = getCurrentStage().cashBonus;
-  gameState.pendingReward = { rewards, passiveChoices, cashBonus };
+  gameState.pendingReward = { rewards, passiveChoices, routeChoices, cashBonus };
   gameState.selectedRewardCard = null;
   gameState.selectedRewardPassive = null;
+  gameState.selectedRewardRoute = null;
   elements.rewardTitle.textContent = `Stage ${gameState.stageIndex + 1} Clear Reward`;
   elements.rewardCashText.textContent = `現金ボーナス: ${formatYen(cashBonus)}`;
   elements.rewardCards.innerHTML = "";
@@ -1404,6 +1515,17 @@ function showRewards() {
     button.innerHTML = `<strong>${passive.name}</strong><span>${passive.description}</span>`;
     button.addEventListener("click", () => selectRewardPassive(passiveId));
     elements.passiveRewards.appendChild(button);
+  });
+
+  elements.routeRewards.innerHTML = "";
+  routeChoices.forEach((routeId) => {
+    const route = ROUTE_DEFINITIONS[routeId];
+    const button = document.createElement("button");
+    button.className = "route-option";
+    button.dataset.routeId = routeId;
+    button.innerHTML = `<strong>${route.name}</strong><span>${route.description}</span>`;
+    button.addEventListener("click", () => selectRewardRoute(routeId));
+    elements.routeRewards.appendChild(button);
   });
   updateRewardConfirmState();
   elements.rewardModal.classList.remove("hidden");
@@ -1427,6 +1549,10 @@ function drawPassiveChoices() {
   return shuffle(available).slice(0, 3);
 }
 
+function drawRouteChoices() {
+  return shuffle(Object.keys(ROUTE_DEFINITIONS)).slice(0, 3);
+}
+
 function selectRewardCard(cardId) {
   gameState.selectedRewardCard = cardId;
   [...elements.rewardCards.children].forEach((cardElement) => {
@@ -1443,8 +1569,16 @@ function selectRewardPassive(passiveId) {
   updateRewardConfirmState();
 }
 
+function selectRewardRoute(routeId) {
+  gameState.selectedRewardRoute = routeId;
+  [...elements.routeRewards.children].forEach((button) => {
+    button.classList.toggle("selected", button.dataset.routeId === routeId);
+  });
+  updateRewardConfirmState();
+}
+
 function updateRewardConfirmState() {
-  elements.confirmRewardButton.disabled = !gameState.selectedRewardCard || !gameState.selectedRewardPassive;
+  elements.confirmRewardButton.disabled = !gameState.selectedRewardCard || !gameState.selectedRewardPassive || !gameState.selectedRewardRoute;
 }
 
 function canUseCard(card, target) {
@@ -1581,8 +1715,10 @@ function renderStageInfo() {
   const hpRatio = gameState.bossMaxHp > 0 ? Math.max(0, gameState.bossHp / gameState.bossMaxHp) : 0;
 
   elements.stageNameText.textContent = gameState.started ? `${stage.name} / ${stage.theme}` : "-";
+  elements.routeText.textContent = gameState.started ? (getCurrentRoute().name || "標準") : "-";
   elements.bossNameText.textContent = gameState.started ? stage.bossName : "-";
   elements.bossHpText.textContent = gameState.started ? `${formatYen(gameState.bossHp)} / ${formatYen(gameState.bossMaxHp)}` : "-";
+  elements.bossGuardText.textContent = gameState.started ? formatYen(getBossGuard()) : "-";
   elements.bossHpFill.style.width = `${hpRatio * 100}%`;
   elements.stageStartText.textContent = gameState.started ? formatYen(gameState.stageStartAssets) : "-";
   elements.stageProfitText.textContent = gameState.started ? formatYen(profit) : "-";

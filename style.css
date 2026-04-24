@@ -855,7 +855,8 @@ button:disabled {
 
 button:active,
 .card:not(.disabled):active,
-.passive-option:active {
+.passive-option:active,
+.route-option:active {
   transform: translateY(3px);
 }
 
@@ -907,14 +908,16 @@ button:active,
   text-shadow: 2px 2px 0 #05070b;
 }
 
-.passive-reward-grid {
+.passive-reward-grid,
+.route-reward-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 14px;
   padding: 18px 0;
 }
 
-.passive-option {
+.passive-option,
+.route-option {
   min-height: 132px;
   border: 2px solid var(--line);
   border-radius: 0;
@@ -926,25 +929,30 @@ button:active,
 }
 
 .passive-option strong,
-.passive-option span {
+.passive-option span,
+.route-option strong,
+.route-option span {
   display: block;
 }
 
-.passive-option strong {
+.passive-option strong,
+.route-option strong {
   margin-bottom: 10px;
   color: var(--yellow);
   font-size: 16px;
   text-shadow: 2px 2px 0 #05070b;
 }
 
-.passive-option span {
+.passive-option span,
+.route-option span {
   color: #dce7d8;
   font-size: 13px;
   line-height: 1.55;
 }
 
 .card.selected,
-.passive-option.selected {
+.passive-option.selected,
+.route-option.selected {
   outline: 3px solid var(--yellow);
   outline-offset: 2px;
 }
