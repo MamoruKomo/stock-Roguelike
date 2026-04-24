@@ -397,6 +397,18 @@ const CARD_DEFINITIONS = {
       addLog("分岐ルートを確保。次の市場イベントは2候補から有利な方を選びます。");
     }
   },
+  guardBreak: {
+    id: "guardBreak",
+    name: "ガードブレイク",
+    rarity: "Rare",
+    category: "コンボ",
+    description: "このターンのボスガードを50%削る。小さな利益を通すための突破カード。",
+    target: "none",
+    use() {
+      gameState.effects.guardBreakCharges += 1;
+      addLog("ガードブレイク準備。次のダメージ計算でボスガードを50%削ります。");
+    }
+  },
   curse: {
     id: "curse",
     name: "塩漬けポジション",
@@ -442,7 +454,8 @@ const REWARD_POOL = [
   "jokerMultiplier",
   "relicHunt",
   "deckThin",
-  "marketBranch"
+  "marketBranch",
+  "guardBreak"
 ];
 
 const ROUTE_DEFINITIONS = {
@@ -472,9 +485,9 @@ const ROUTE_DEFINITIONS = {
   cursed: {
     id: "cursed",
     name: "呪いの資金調達",
-    description: "現金25万円を得るが、デッキに呪いカードが2枚混ざる。",
-    startCash: 250000,
-    curseCards: 2
+    description: "現金20万円を得るが、デッキに呪いカードが3枚混ざる。",
+    startCash: 200000,
+    curseCards: 3
   }
 };
 
@@ -518,7 +531,9 @@ const ICON_INDEX = {
   cursed: 36,
   bossGuard: 37,
   chart: 38,
-  overheat: 39
+  overheat: 39,
+  guardBreak: 37,
+  taxShelter: 23
 };
 
 const ICON_COLUMNS = 8;
@@ -563,7 +578,8 @@ const gameState = {
     diversifyCharges: 0,
     crashGuards: 0,
     upsideBoostCharges: 0,
-    marketChoiceCharges: 0
+    marketChoiceCharges: 0,
+    guardBreakCharges: 0
   },
   relics: [],
   passives: [],
@@ -629,6 +645,7 @@ const elements = {
   resultLabel: document.getElementById("resultLabel"),
   resultTitle: document.getElementById("resultTitle"),
   resultMessage: document.getElementById("resultMessage"),
+  floatingTooltip: document.getElementById("floatingTooltip"),
   impactLayer: document.getElementById("impactLayer")
 };
 
@@ -667,7 +684,14 @@ function resetGame() {
   gameState.hand = [];
   gameState.playedThisTurn = 0;
   gameState.nextDrawBonus = 0;
-  gameState.effects = { margin: false, diversifyCharges: 0, crashGuards: 0, upsideBoostCharges: 0, marketChoiceCharges: 0 };
+  gameState.effects = {
+    margin: false,
+    diversifyCharges: 0,
+    crashGuards: 0,
+    upsideBoostCharges: 0,
+    marketChoiceCharges: 0,
+    guardBreakCharges: 0
+  };
   gameState.relics = [];
   gameState.passives = [];
   gameState.pendingReward = null;
@@ -1054,7 +1078,7 @@ function resolveBossDamage() {
     const concentrationRate = getLargestHoldingExposure();
     const concentrationPenalty = gameState.stageIndex >= 1 && concentrationRate > 0.7 ? 0.75 : 1;
     const rawDamage = Math.floor(baseDamage * multiplier) + bonusDamage;
-    const guard = getBossGuard();
+    const guard = getEffectiveBossGuard();
     const guardedDamage = Math.max(0, rawDamage - guard);
     const damage = Math.floor(guardedDamage * concentrationPenalty);
     const hpBefore = gameState.bossHp;
@@ -1067,6 +1091,10 @@ function resolveBossDamage() {
     }
     if (rawDamage > 0 && guardedDamage <= 0) {
       addLog(`ボスガード: 小さい利益 ${formatYen(rawDamage)} はガード ${formatYen(guard)} に吸収されました。`);
+    }
+    if (gameState.effects.guardBreakCharges > 0) {
+      gameState.effects.guardBreakCharges -= 1;
+      addLog(`ガードブレイク発動: ボスガードを ${formatYen(getBossGuard())} → ${formatYen(guard)} に低下。`);
     }
     addLog(`利益 ${formatYen(baseDamage)} × COMBO ${multiplier.toFixed(2)} + 読み切り ${formatYen(bonusDamage)} - ガード ${formatYen(guard)} = <strong>${formatYen(damage)}</strong> ダメージ。残HP ${formatYen(gameState.bossHp)}。`);
     triggerImpact(damage > 0 ? `${formatYen(damage)} DAMAGE` : "GUARDED", damage > 0 ? "damage" : "miss");
@@ -1234,7 +1262,8 @@ function calculateMaxBuyShares(price) {
 }
 
 function getProfitTaxRate() {
-  return hasPassive("feeCut") ? 0.08 : 0.15;
+  const baseRate = hasPassive("feeCut") ? 0.08 : 0.15;
+  return hasRelic("taxShelter") ? baseRate * 0.5 : baseRate;
 }
 
 function improveAverageCost(symbol, improvementRate) {
@@ -1428,6 +1457,11 @@ const RELIC_DEFINITIONS = [
     id: "riskMeter",
     name: "リスク計量器",
     description: "各ターン開始時、下落イベント半減を1回得る。"
+  },
+  {
+    id: "taxShelter",
+    name: "節税口座",
+    description: "短期利確税を半減する。細かい利確をビルドとして成立させやすくする。"
   }
 ];
 
@@ -1462,6 +1496,12 @@ function getStageMarketMultiplier() {
 
 function getBossGuard() {
   return getCurrentStage().guard + (getCurrentRoute().guardBonus || 0);
+}
+
+function getEffectiveBossGuard() {
+  const guard = getBossGuard();
+  if (gameState.effects.guardBreakCharges <= 0) return guard;
+  return Math.floor(guard * 0.5);
 }
 
 function countHeldStocks() {
@@ -1562,6 +1602,9 @@ function showRewards() {
     const button = document.createElement("button");
     button.className = "passive-option";
     button.dataset.passiveId = passiveId;
+    button.setAttribute("data-tooltip-title", passive.name);
+    button.setAttribute("data-tooltip-meta", "Passive");
+    button.setAttribute("data-tooltip", passive.description);
     button.innerHTML = `${renderIcon(passiveId)}<strong>${passive.name}</strong><span>${passive.description}</span>`;
     button.addEventListener("click", () => selectRewardPassive(passiveId));
     elements.passiveRewards.appendChild(button);
@@ -1573,6 +1616,9 @@ function showRewards() {
     const button = document.createElement("button");
     button.className = "route-option";
     button.dataset.routeId = routeId;
+    button.setAttribute("data-tooltip-title", route.name);
+    button.setAttribute("data-tooltip-meta", "Route");
+    button.setAttribute("data-tooltip", route.description);
     button.innerHTML = `${renderIcon(routeId)}<strong>${route.name}</strong><span>${route.description}</span>`;
     button.addEventListener("click", () => selectRewardRoute(routeId));
     elements.routeRewards.appendChild(button);
@@ -1768,7 +1814,8 @@ function renderStageInfo() {
   elements.routeText.textContent = gameState.started ? (getCurrentRoute().name || "標準") : "-";
   elements.bossNameText.textContent = gameState.started ? stage.bossName : "-";
   elements.bossHpText.textContent = gameState.started ? `${formatYen(gameState.bossHp)} / ${formatYen(gameState.bossMaxHp)}` : "-";
-  elements.bossGuardText.textContent = gameState.started ? formatYen(getBossGuard()) : "-";
+  elements.bossGuardText.textContent = gameState.started ? formatYen(getEffectiveBossGuard()) : "-";
+  elements.bossGuardText.className = gameState.effects.guardBreakCharges > 0 ? "positive" : "neutral";
   elements.bossHpFill.style.width = `${hpRatio * 100}%`;
   elements.stageStartText.textContent = gameState.started ? formatYen(gameState.stageStartAssets) : "-";
   elements.stageProfitText.textContent = gameState.started ? formatYen(profit) : "-";
@@ -1782,14 +1829,29 @@ function renderStageInfo() {
 }
 
 function renderPassiveList() {
-  const passiveNames = gameState.passives.map((passiveId) => PASSIVE_DEFINITIONS[passiveId].name);
-  const relicNames = gameState.relics
+  const passives = gameState.passives
+    .map((passiveId) => PASSIVE_DEFINITIONS[passiveId])
+    .filter(Boolean)
+    .map((passive) => ({
+      id: passive.id,
+      name: passive.name,
+      type: "Passive",
+      description: passive.description
+    }));
+  const relics = gameState.relics
     .map((relicId) => RELIC_DEFINITIONS.find((relic) => relic.id === relicId))
     .filter(Boolean)
-    .map((relic) => relic.name);
-  const names = [...passiveNames, ...relicNames];
-  if (names.length === 0) return `<span class="empty-inline">なし</span>`;
-  return names.map((name) => `<span class="passive-chip">${name}</span>`).join("");
+    .map((relic) => ({
+      id: relic.id,
+      name: relic.name,
+      type: "Relic",
+      description: relic.description
+    }));
+  const entries = [...passives, ...relics];
+  if (entries.length === 0) return `<span class="empty-inline">なし</span>`;
+  return entries
+    .map((entry) => `<span class="passive-chip" ${tooltipAttrs(entry.name, entry.description, entry.type)}>${renderIcon(entry.id, "mini-icon")}${escapeHtml(entry.name)}</span>`)
+    .join("");
 }
 
 function renderMarketScreen() {
@@ -1938,7 +2000,7 @@ function renderDeckView() {
 
   elements.deckSummary.textContent = `Deck ${gameState.deck.length} / 山札 ${gameState.drawPile.length} / 捨札 ${gameState.discardPile.length}`;
   elements.deckList.innerHTML = orderedCards
-    .map(({ card, count }) => `<span class="deck-pill ${card.rarity.toLowerCase()}">${renderIcon(card.id)}${card.name}<b>x${count}</b></span>`)
+    .map(({ card, count }) => `<span class="deck-pill ${card.rarity.toLowerCase()}" ${tooltipAttrs(card.name, card.description, `${card.rarity} / ${card.category} / x${count}`)}>${renderIcon(card.id)}${escapeHtml(card.name)}<b>x${count}</b></span>`)
     .join("");
 }
 
@@ -1959,6 +2021,21 @@ function getIconStyle(iconId) {
   const x = ICON_COLUMNS === 1 ? 0 : (column / (ICON_COLUMNS - 1)) * 100;
   const y = ICON_ROWS === 1 ? 0 : (row / (ICON_ROWS - 1)) * 100;
   return `background-position: ${x.toFixed(4)}% ${y.toFixed(4)}%;`;
+}
+
+function tooltipAttrs(title, description, meta = "") {
+  return `data-tooltip-title="${escapeAttr(title)}" data-tooltip-meta="${escapeAttr(meta)}" data-tooltip="${escapeAttr(description)}"`;
+}
+
+function escapeAttr(value) {
+  return escapeHtml(value).replace(/"/g, "&quot;");
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
 }
 
 function openCompendium() {
@@ -2023,14 +2100,14 @@ function renderCompendium() {
       <h3>${section.title}</h3>
       <div class="compendium-grid">
         ${section.entries.map((entry) => `
-          <article class="compendium-entry">
+          <article class="compendium-entry" ${tooltipAttrs(entry.name, entry.description, entry.type)}>
             ${renderIcon(entry.id, "compendium-icon")}
             <div>
               <div class="compendium-entry-top">
-                <strong>${entry.name}</strong>
-                <span>${entry.type}</span>
+                <strong>${escapeHtml(entry.name)}</strong>
+                <span>${escapeHtml(entry.type)}</span>
               </div>
-              <p>${entry.description}</p>
+              <p>${escapeHtml(entry.description)}</p>
             </div>
           </article>
         `).join("")}
@@ -2042,6 +2119,9 @@ function renderCompendium() {
 function createCardElement(card, options) {
   const element = document.createElement("article");
   element.className = `card ${card.rarity.toLowerCase()} ${getCardFrameClass(card)}`;
+  element.setAttribute("data-tooltip-title", card.name);
+  element.setAttribute("data-tooltip-meta", `${card.rarity} / ${card.category}`);
+  element.setAttribute("data-tooltip", card.description);
 
   const targets = getTargetsForCard(card);
   const isTargetCard = card.target !== "none" && !options.reward;
@@ -2128,13 +2208,15 @@ function renderEffects() {
     { label: `暴落耐性 ${gameState.effects.crashGuards}`, active: gameState.effects.crashGuards > 0 },
     { label: `倍率 ${gameState.effects.upsideBoostCharges}`, active: gameState.effects.upsideBoostCharges > 0 },
     { label: `分岐 ${gameState.effects.marketChoiceCharges}`, active: gameState.effects.marketChoiceCharges > 0 },
+    { label: `ブレイク ${gameState.effects.guardBreakCharges}`, active: gameState.effects.guardBreakCharges > 0 },
     { label: `ポジション ${positionRate}%`, active: positionRate > 70 },
     { label: `パッシブ ${gameState.passives.length}`, active: gameState.passives.length > 0 },
-    { label: `レリック ${gameState.relics.length}${relicNames ? `: ${relicNames}` : ""}`, active: gameState.relics.length > 0 },
-    { label: `山札 ${gameState.drawPile.length}`, active: false },
-    { label: `捨札 ${gameState.discardPile.length}`, active: false },
-    { label: `デッキ ${gameState.deck.length}`, active: false }
-  ];
+    { label: `レリック ${gameState.relics.length}${relicNames ? `: ${relicNames}` : ""}`, active: gameState.relics.length > 0 }
+  ].filter((badge) => badge.active);
+
+  if (badges.length === 0) {
+    badges.push({ label: "状態なし", active: false });
+  }
 
   elements.effectBadges.innerHTML = badges
     .map((badge) => `<span class="badge ${badge.active ? "active" : ""}">${badge.label}</span>`)
@@ -2194,6 +2276,61 @@ function pulseElement(element, className) {
     window.setTimeout(() => element.classList.remove(className), 520);
   });
 }
+
+function getTooltipTarget(event) {
+  return event.target && event.target.closest ? event.target.closest("[data-tooltip]") : null;
+}
+
+function showTooltip(target, event) {
+  if (!elements.floatingTooltip || !target) return;
+  const title = target.getAttribute("data-tooltip-title") || "";
+  const meta = target.getAttribute("data-tooltip-meta") || "";
+  const description = target.getAttribute("data-tooltip") || "";
+  elements.floatingTooltip.innerHTML = `
+    <strong>${escapeHtml(title)}</strong>
+    ${meta ? `<span>${escapeHtml(meta)}</span>` : ""}
+    <p>${escapeHtml(description)}</p>
+  `;
+  elements.floatingTooltip.classList.remove("hidden");
+  moveTooltip(event);
+}
+
+function moveTooltip(event) {
+  if (!elements.floatingTooltip || elements.floatingTooltip.classList.contains("hidden") || !event) return;
+  const margin = 18;
+  const rect = elements.floatingTooltip.getBoundingClientRect();
+  const viewportWidth = window.innerWidth || document.documentElement.clientWidth;
+  const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+  const originX = Number.isFinite(event.clientX) ? event.clientX : viewportWidth / 2;
+  const originY = Number.isFinite(event.clientY) ? event.clientY : viewportHeight / 2;
+  let left = originX + margin;
+  let top = originY + margin;
+  if (left + rect.width > viewportWidth - 8) left = Math.max(8, originX - rect.width - margin);
+  if (top + rect.height > viewportHeight - 8) top = Math.max(8, originY - rect.height - margin);
+  elements.floatingTooltip.style.left = `${left}px`;
+  elements.floatingTooltip.style.top = `${top}px`;
+}
+
+function hideTooltip() {
+  if (!elements.floatingTooltip) return;
+  elements.floatingTooltip.classList.add("hidden");
+}
+
+document.addEventListener("mouseover", (event) => showTooltip(getTooltipTarget(event), event));
+document.addEventListener("mousemove", moveTooltip);
+document.addEventListener("mouseout", (event) => {
+  const target = getTooltipTarget(event);
+  if (target && (!event.relatedTarget || !target.contains(event.relatedTarget))) hideTooltip();
+});
+document.addEventListener("focusin", (event) => showTooltip(getTooltipTarget(event), event));
+document.addEventListener("focusout", hideTooltip);
+document.addEventListener("pointerdown", (event) => {
+  const target = getTooltipTarget(event);
+  if (!target || event.pointerType === "mouse") return;
+  showTooltip(target, event);
+  window.clearTimeout(showTooltip.touchTimer);
+  showTooltip.touchTimer = window.setTimeout(hideTooltip, 2200);
+});
 
 elements.startButton.addEventListener("click", resetGame);
 elements.compendiumButton.addEventListener("click", openCompendium);

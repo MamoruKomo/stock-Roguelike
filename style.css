@@ -317,6 +317,9 @@ button:disabled {
 
 .passive-chip,
 .empty-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   border: 2px solid var(--line);
   background: #101a24;
   color: var(--text);
@@ -364,6 +367,7 @@ button:disabled {
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 8px;
+  max-width: 360px;
 }
 
 .badge {
@@ -691,7 +695,7 @@ button:disabled {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  max-height: 76px;
+  max-height: 58px;
   overflow: auto;
   padding-bottom: 10px;
   scrollbar-color: var(--green) #05070b;
@@ -709,6 +713,7 @@ button:disabled {
   font-size: 11px;
   font-weight: 800;
   text-shadow: 2px 2px 0 #05070b;
+  cursor: help;
 }
 
 .deck-pill b {
@@ -985,6 +990,14 @@ button:active,
   vertical-align: middle;
 }
 
+.mini-icon {
+  width: 18px;
+  height: 18px;
+  flex-basis: 18px;
+  border-width: 1px;
+  box-shadow: none;
+}
+
 .deck-pill .pixel-icon {
   width: 22px;
   height: 22px;
@@ -1045,6 +1058,7 @@ button:active,
   border: 2px solid var(--line);
   background: #071018;
   padding: 10px;
+  cursor: help;
 }
 
 .compendium-entry .compendium-icon {
@@ -1090,6 +1104,45 @@ button:active,
 
 .result-card button {
   margin-top: 12px;
+}
+
+.floating-tooltip {
+  position: fixed;
+  z-index: 30;
+  width: min(320px, calc(100vw - 24px));
+  border: 2px solid var(--yellow);
+  background: #05070b;
+  color: var(--text);
+  padding: 10px 12px;
+  box-shadow: 0 0 0 2px #05070b, 0 8px 0 rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+  text-shadow: 2px 2px 0 #05070b;
+}
+
+.floating-tooltip.hidden {
+  display: none;
+}
+
+.floating-tooltip strong {
+  display: block;
+  color: #f4fff0;
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+
+.floating-tooltip span {
+  display: block;
+  color: var(--yellow);
+  font-size: 11px;
+  font-weight: 800;
+  margin-bottom: 6px;
+}
+
+.floating-tooltip p {
+  margin: 0;
+  color: #dce7d8;
+  font-size: 12px;
+  line-height: 1.55;
 }
 
 .impact-layer {
