@@ -824,6 +824,13 @@ button:active,
   box-shadow: 0 0 0 3px #05070b, 0 0 0 6px rgba(67, 227, 93, 0.7), 0 12px 0 rgba(0, 0, 0, 0.5);
 }
 
+.impact-bonus {
+  border-color: var(--yellow);
+  color: var(--yellow);
+  font-size: 22px;
+  box-shadow: 0 0 0 3px #05070b, 0 0 0 6px rgba(255, 209, 59, 0.72), 0 12px 0 rgba(0, 0, 0, 0.5);
+}
+
 .impact-miss {
   border-color: var(--line-bright);
   color: var(--muted);

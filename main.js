@@ -446,6 +446,7 @@ const gameState = {
   lastTurnAssets: INITIAL_CASH,
   stageDamage: 0,
   lastDamage: 0,
+  bonusDamageThisTurn: 0,
   damageCombo: 0,
   lastOverkill: 0,
   bossHp: 0,
@@ -631,6 +632,7 @@ function useCard(instanceId, target) {
 function endTurn() {
   if (!gameState.started || gameState.gameOver || gameState.waitingForReward) return;
 
+  gameState.bonusDamageThisTurn = 0;
   gameState.discardPile.push(...gameState.hand);
   gameState.hand = [];
   setPreviousPrices();
@@ -675,6 +677,7 @@ function setupStage(stageIndex) {
   gameState.lastTurnAssets = gameState.stageStartAssets;
   gameState.stageDamage = 0;
   gameState.lastDamage = 0;
+  gameState.bonusDamageThisTurn = 0;
   gameState.damageCombo = 0;
   gameState.lastOverkill = 0;
   gameState.bossHp = stage.hp;
@@ -812,12 +815,14 @@ function resolveBossEvent() {
   if (gameState.stageIndex === 0) {
     const percent = plan.positive ? 0.25 : -0.20;
     applyPriceChanges({ [plan.target]: percent }, "決算発表");
+    rewardReadBonus(plan.target, plan.positive, "決算読み切り");
     return;
   }
 
   if (gameState.stageIndex === 1) {
     const percent = plan.positive ? 0.35 : -0.30;
     applyPriceChanges({ [plan.target]: percent }, "SNS相場");
+    rewardReadBonus(plan.target, plan.positive, "SNS読み切り");
     return;
   }
 
@@ -825,16 +830,51 @@ function resolveBossEvent() {
     const target = getLargestHoldingSymbol() || randomItem(gameState.stocks).symbol;
     const diversified = countHeldStocks() >= 3;
     applyPriceChanges({ [target]: diversified ? -0.10 : -0.25 }, diversified ? "分散で軽減した空売り" : "空売りファンドの集中攻撃");
+    if (diversified) addBonusDamage(Math.floor(getCurrentStage().hp * 0.40), "分散包囲ボーナス");
     return;
   }
 
   if (gameState.stageIndex === 3) {
     applyPriceChanges({ TECH: -0.25, GAME: -0.15, GREEN: -0.15, CARE: -0.05 }, "中央銀行ショック");
+    const techExposure = calculateStockExposure("TECH");
+    const careExposure = calculateStockExposure("CARE");
+    if (techExposure < 0.15 && careExposure > 0) {
+      addBonusDamage(Math.floor(getCurrentStage().hp * 0.35), "金融引き締め対応ボーナス");
+    }
     return;
   }
 
   applyPriceChanges({ TECH: -0.30, CARE: -0.30, GAME: -0.30, GREEN: -0.30 }, "ブラックマンデー暴落");
   applyPriceChanges({ [plan.rebound]: 0.50 }, "暴落後の大反発");
+  if (findStock(plan.rebound).shares > 0) {
+    addBonusDamage(Math.floor(findStock(plan.rebound).shares * findStock(plan.rebound).price * 0.35), "大反発キャッチボーナス");
+  }
+}
+
+function rewardReadBonus(symbol, positive, label) {
+  const exposure = calculateStockExposure(symbol);
+  if (positive && findStock(symbol).shares > 0) {
+    addBonusDamage(Math.floor(findStock(symbol).shares * findStock(symbol).price * 0.35), label);
+    return;
+  }
+  if (!positive && exposure < 0.08) {
+    addBonusDamage(Math.floor(getCurrentStage().hp * 0.75), label);
+  }
+}
+
+function calculateStockExposure(symbol) {
+  const total = calculateTotalAssets();
+  if (total <= 0) return 0;
+  const stock = findStock(symbol);
+  return (stock.price * stock.shares) / total;
+}
+
+function addBonusDamage(amount, label) {
+  const damage = Math.max(0, Math.floor(amount));
+  if (damage <= 0) return;
+  gameState.bonusDamageThisTurn += damage;
+  addLog(`${label}: 追加 ${formatYen(damage)} ダメージ。`);
+  triggerImpact(`${label} +${formatYen(damage)}`, "bonus");
 }
 
 function scaleChanges(changes, multiplier) {
@@ -847,16 +887,17 @@ function resolveBossDamage() {
   const total = calculateTotalAssets();
   const gain = total - gameState.lastTurnAssets;
   const baseDamage = Math.max(0, Math.floor(gain));
-  if (baseDamage > 0) {
+  const bonusDamage = gameState.bonusDamageThisTurn;
+  if (baseDamage > 0 || bonusDamage > 0) {
     gameState.damageCombo += 1;
     const multiplier = getDamageComboMultiplier();
-    const damage = Math.floor(baseDamage * multiplier);
+    const damage = Math.floor(baseDamage * multiplier) + bonusDamage;
     const hpBefore = gameState.bossHp;
     gameState.bossHp = Math.max(0, gameState.bossHp - damage);
     gameState.lastDamage = damage;
     gameState.stageDamage += damage;
     gameState.lastOverkill = Math.max(0, damage - hpBefore);
-    addLog(`利益 ${formatYen(baseDamage)} × COMBO ${multiplier.toFixed(2)} = <strong>${formatYen(damage)}</strong> ダメージ。残HP ${formatYen(gameState.bossHp)}。`);
+    addLog(`利益 ${formatYen(baseDamage)} × COMBO ${multiplier.toFixed(2)} + 読み切り ${formatYen(bonusDamage)} = <strong>${formatYen(damage)}</strong> ダメージ。残HP ${formatYen(gameState.bossHp)}。`);
     triggerImpact(`${formatYen(damage)} DAMAGE`, "damage");
     pulseElement(elements.bossHpFill, "hit");
   } else {
