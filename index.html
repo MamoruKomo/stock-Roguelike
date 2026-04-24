@@ -14,6 +14,7 @@
         <h1>マーケットダンジョン</h1>
       </div>
       <div class="top-actions">
+        <button id="compendiumButton" class="ghost-button">図鑑</button>
         <button id="startButton" class="primary-button">ゲーム開始</button>
         <button id="restartButton" class="ghost-button">リスタート</button>
       </div>
@@ -225,6 +226,19 @@
       <h2 id="resultTitle">ゲーム終了</h2>
       <p id="resultMessage"></p>
       <button id="resultRestartButton" class="primary-button">もう一度プレイ</button>
+    </div>
+  </div>
+
+  <div id="compendiumModal" class="modal hidden">
+    <div class="modal-card compendium-card">
+      <div class="compendium-header">
+        <div>
+          <p class="eyebrow">Compendium</p>
+          <h2>カード・アイテム図鑑</h2>
+        </div>
+        <button id="compendiumCloseButton" class="ghost-button">閉じる</button>
+      </div>
+      <div id="compendiumContent" class="compendium-content"></div>
     </div>
   </div>
 

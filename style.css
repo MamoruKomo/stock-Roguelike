@@ -46,6 +46,7 @@ body::before {
 img,
 .topbar,
 .card,
+.pixel-icon,
 body::before {
   image-rendering: pixelated;
 }
@@ -698,6 +699,9 @@ button:disabled {
 
 .deck-pill,
 .deck-empty {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   border: 2px solid var(--line);
   background: #081018;
   color: var(--text);
@@ -792,9 +796,14 @@ button:disabled {
 
 .card-top {
   display: flex;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 10px;
   margin-bottom: 12px;
+}
+
+.card-top > div {
+  flex: 1;
 }
 
 .card h3 {
@@ -960,6 +969,114 @@ button:active,
 .reward-confirm {
   width: 100%;
   margin-top: 8px;
+}
+
+.pixel-icon {
+  display: inline-block;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  border: 2px solid rgba(159, 176, 173, 0.82);
+  background-image: url("assets/compendium_icons.png");
+  background-size: 800% 500%;
+  background-repeat: no-repeat;
+  background-color: #05070b;
+  box-shadow: 0 0 0 2px #05070b;
+  vertical-align: middle;
+}
+
+.deck-pill .pixel-icon {
+  width: 22px;
+  height: 22px;
+  margin-right: 5px;
+  border-width: 1px;
+  box-shadow: none;
+}
+
+.passive-option .pixel-icon,
+.route-option .pixel-icon {
+  margin-bottom: 10px;
+}
+
+.compendium-card {
+  width: min(1180px, 100%);
+  max-height: calc(100vh - 56px);
+  overflow: hidden;
+  display: grid;
+  grid-template-rows: auto 1fr;
+}
+
+.compendium-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 14px;
+  border-bottom: 2px solid var(--line);
+}
+
+.compendium-content {
+  overflow: auto;
+  padding-top: 14px;
+  scrollbar-color: var(--green) #05070b;
+}
+
+.compendium-section {
+  margin-bottom: 20px;
+}
+
+.compendium-section h3 {
+  margin: 0 0 10px;
+  color: var(--yellow);
+  font-size: 16px;
+  text-shadow: 2px 2px 0 #05070b;
+}
+
+.compendium-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.compendium-entry {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr);
+  gap: 12px;
+  border: 2px solid var(--line);
+  background: #071018;
+  padding: 10px;
+}
+
+.compendium-entry .compendium-icon {
+  width: 48px;
+  height: 48px;
+}
+
+.compendium-entry-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.compendium-entry-top strong {
+  color: var(--text);
+  font-size: 15px;
+  text-shadow: 2px 2px 0 #05070b;
+}
+
+.compendium-entry-top span {
+  color: var(--yellow);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.compendium-entry p {
+  margin: 0;
+  color: #dce7d8;
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .result-card {

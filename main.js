@@ -478,6 +478,52 @@ const ROUTE_DEFINITIONS = {
   }
 };
 
+const ICON_INDEX = {
+  buy: 0,
+  takeProfit: 1,
+  averageDown: 2,
+  stopLoss: 3,
+  margin: 4,
+  goodEarnings: 5,
+  badEarnings: 6,
+  snsFire: 7,
+  policyTheme: 8,
+  rateHike: 9,
+  diversify: 10,
+  cashRatio: 11,
+  crashGuard: 12,
+  strongBuy: 13,
+  megaEarnings: 14,
+  ironGuard: 15,
+  diceRoll: 16,
+  jokerMultiplier: 17,
+  relicHunt: 18,
+  deckThin: 19,
+  marketBranch: 20,
+  curse: 21,
+  analysis: 22,
+  feeCut: 23,
+  diversifiedInvestor: 24,
+  contrarian: 25,
+  riskManagement: 26,
+  infoNetwork: 27,
+  longTerm: 28,
+  gambler: 29,
+  compoundSeed: 30,
+  tradingTerminal: 31,
+  riskMeter: 32,
+  volatile: 33,
+  elite: 34,
+  safe: 35,
+  cursed: 36,
+  bossGuard: 37,
+  chart: 38,
+  overheat: 39
+};
+
+const ICON_COLUMNS = 8;
+const ICON_ROWS = 5;
+
 const gameState = {
   started: false,
   gameOver: false,
@@ -525,6 +571,10 @@ const gameState = {
 };
 
 const elements = {
+  compendiumButton: document.getElementById("compendiumButton"),
+  compendiumCloseButton: document.getElementById("compendiumCloseButton"),
+  compendiumModal: document.getElementById("compendiumModal"),
+  compendiumContent: document.getElementById("compendiumContent"),
   startButton: document.getElementById("startButton"),
   restartButton: document.getElementById("restartButton"),
   resultRestartButton: document.getElementById("resultRestartButton"),
@@ -1512,7 +1562,7 @@ function showRewards() {
     const button = document.createElement("button");
     button.className = "passive-option";
     button.dataset.passiveId = passiveId;
-    button.innerHTML = `<strong>${passive.name}</strong><span>${passive.description}</span>`;
+    button.innerHTML = `${renderIcon(passiveId)}<strong>${passive.name}</strong><span>${passive.description}</span>`;
     button.addEventListener("click", () => selectRewardPassive(passiveId));
     elements.passiveRewards.appendChild(button);
   });
@@ -1523,7 +1573,7 @@ function showRewards() {
     const button = document.createElement("button");
     button.className = "route-option";
     button.dataset.routeId = routeId;
-    button.innerHTML = `<strong>${route.name}</strong><span>${route.description}</span>`;
+    button.innerHTML = `${renderIcon(routeId)}<strong>${route.name}</strong><span>${route.description}</span>`;
     button.addEventListener("click", () => selectRewardRoute(routeId));
     elements.routeRewards.appendChild(button);
   });
@@ -1888,7 +1938,7 @@ function renderDeckView() {
 
   elements.deckSummary.textContent = `Deck ${gameState.deck.length} / 山札 ${gameState.drawPile.length} / 捨札 ${gameState.discardPile.length}`;
   elements.deckList.innerHTML = orderedCards
-    .map(({ card, count }) => `<span class="deck-pill ${card.rarity.toLowerCase()}">${card.name}<b>x${count}</b></span>`)
+    .map(({ card, count }) => `<span class="deck-pill ${card.rarity.toLowerCase()}">${renderIcon(card.id)}${card.name}<b>x${count}</b></span>`)
     .join("");
 }
 
@@ -1896,6 +1946,97 @@ function rarityRank(rarity) {
   if (rarity === "Epic") return 3;
   if (rarity === "Rare") return 2;
   return 1;
+}
+
+function renderIcon(iconId, extraClass = "") {
+  return `<span class="pixel-icon ${extraClass}" style="${getIconStyle(iconId)}" aria-hidden="true"></span>`;
+}
+
+function getIconStyle(iconId) {
+  const index = ICON_INDEX[iconId] ?? 0;
+  const column = index % ICON_COLUMNS;
+  const row = Math.floor(index / ICON_COLUMNS);
+  const x = ICON_COLUMNS === 1 ? 0 : (column / (ICON_COLUMNS - 1)) * 100;
+  const y = ICON_ROWS === 1 ? 0 : (row / (ICON_ROWS - 1)) * 100;
+  return `background-position: ${x.toFixed(4)}% ${y.toFixed(4)}%;`;
+}
+
+function openCompendium() {
+  renderCompendium();
+  elements.compendiumModal.classList.remove("hidden");
+}
+
+function closeCompendium() {
+  elements.compendiumModal.classList.add("hidden");
+}
+
+function renderCompendium() {
+  const sections = [
+    {
+      title: "カード",
+      entries: Object.values(CARD_DEFINITIONS).map((card) => ({
+        id: card.id,
+        name: card.name,
+        type: `${card.rarity} / ${card.category}`,
+        description: card.description
+      }))
+    },
+    {
+      title: "パッシブ",
+      entries: Object.values(PASSIVE_DEFINITIONS).map((passive) => ({
+        id: passive.id,
+        name: passive.name,
+        type: "Passive",
+        description: passive.description
+      }))
+    },
+    {
+      title: "レリック",
+      entries: RELIC_DEFINITIONS.map((relic) => ({
+        id: relic.id,
+        name: relic.name,
+        type: "Relic",
+        description: relic.description
+      }))
+    },
+    {
+      title: "ルート",
+      entries: Object.values(ROUTE_DEFINITIONS).map((route) => ({
+        id: route.id,
+        name: route.name,
+        type: "Route",
+        description: route.description
+      }))
+    },
+    {
+      title: "重要システム",
+      entries: [
+        { id: "bossGuard", name: "ボスガード", type: "Mechanic", description: "小さい利益ダメージを吸収します。大きな波、コンボ、読み切りボーナスで突破します。" },
+        { id: "chart", name: "価格チャート", type: "Mechanic", description: "価格推移、前ターン比、評価損益を見てポジションを調整します。" },
+        { id: "overheat", name: "過熱", type: "Mechanic", description: "上昇カードを重ねると溜まり、一定以上で反動売りが発生します。" }
+      ]
+    }
+  ];
+
+  elements.compendiumContent.innerHTML = sections.map((section) => `
+    <section class="compendium-section">
+      <h3>${section.title}</h3>
+      <div class="compendium-grid">
+        ${section.entries.map((entry) => `
+          <article class="compendium-entry">
+            ${renderIcon(entry.id, "compendium-icon")}
+            <div>
+              <div class="compendium-entry-top">
+                <strong>${entry.name}</strong>
+                <span>${entry.type}</span>
+              </div>
+              <p>${entry.description}</p>
+            </div>
+          </article>
+        `).join("")}
+      </div>
+    </section>
+  `).join("");
 }
 
 function createCardElement(card, options) {
@@ -1908,6 +2049,7 @@ function createCardElement(card, options) {
 
   element.innerHTML = `
     <div class="card-top">
+      ${renderIcon(card.id)}
       <div>
         <p class="eyebrow">${card.category}</p>
         <h3>${card.name}</h3>
@@ -2054,6 +2196,11 @@ function pulseElement(element, className) {
 }
 
 elements.startButton.addEventListener("click", resetGame);
+elements.compendiumButton.addEventListener("click", openCompendium);
+elements.compendiumCloseButton.addEventListener("click", closeCompendium);
+elements.compendiumModal.addEventListener("click", (event) => {
+  if (event.target === elements.compendiumModal) closeCompendium();
+});
 elements.restartButton.addEventListener("click", resetGame);
 elements.resultRestartButton.addEventListener("click", resetGame);
 elements.endTurnButton.addEventListener("click", endTurn);
