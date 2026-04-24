@@ -444,6 +444,10 @@ const gameState = {
   stageTurn: 1,
   stageStartAssets: INITIAL_CASH,
   lastTurnAssets: INITIAL_CASH,
+  stageDamage: 0,
+  lastDamage: 0,
+  damageCombo: 0,
+  lastOverkill: 0,
   bossHp: 0,
   bossMaxHp: 0,
   bossPlan: null,
@@ -490,6 +494,8 @@ const elements = {
   bossHpFill: document.getElementById("bossHpFill"),
   stageStartText: document.getElementById("stageStartText"),
   stageProfitText: document.getElementById("stageProfitText"),
+  lastDamageText: document.getElementById("lastDamageText"),
+  comboText: document.getElementById("comboText"),
   bossOmenText: document.getElementById("bossOmenText"),
   passiveList: document.getElementById("passiveList"),
   stockTableBody: document.getElementById("stockTableBody"),
@@ -512,7 +518,8 @@ const elements = {
   resultModal: document.getElementById("resultModal"),
   resultLabel: document.getElementById("resultLabel"),
   resultTitle: document.getElementById("resultTitle"),
-  resultMessage: document.getElementById("resultMessage")
+  resultMessage: document.getElementById("resultMessage"),
+  impactLayer: document.getElementById("impactLayer")
 };
 
 function createInitialStock(template) {
@@ -615,6 +622,7 @@ function useCard(instanceId, target) {
   }
   gameState.playedThisTurn += 1;
   addLog(`カード使用: <strong>${card.name}</strong>`);
+  triggerImpact(card.name, "card");
 
   checkGameEnd();
   render();
@@ -665,6 +673,10 @@ function setupStage(stageIndex) {
   gameState.stageTurn = 1;
   gameState.stageStartAssets = calculateTotalAssets();
   gameState.lastTurnAssets = gameState.stageStartAssets;
+  gameState.stageDamage = 0;
+  gameState.lastDamage = 0;
+  gameState.damageCombo = 0;
+  gameState.lastOverkill = 0;
   gameState.bossHp = stage.hp;
   gameState.bossMaxHp = stage.hp;
   gameState.bossPlan = createBossPlan(stageIndex);
@@ -710,10 +722,12 @@ function prepareStageTurnOmen() {
   if (gameState.stageTurn === 2) {
     gameState.currentOmen = createBossOmen();
     addLog(`ボス予兆: ${gameState.currentOmen}`);
+    triggerDelayedImpact("WARNING", "warning");
     return;
   }
 
   gameState.currentOmen = `ボスターン。${getCurrentStage().bossName} のイベントがターン終了時に発生します。`;
+  triggerDelayedImpact("BOSS TURN", "boss");
 }
 
 function createBossOmen() {
@@ -774,6 +788,7 @@ function resolveStageTurnEvent() {
   }
 
   addLog(`ボスイベント: <strong>${getCurrentStage().bossName}</strong> が動きます。`);
+  triggerImpact("BOSS EVENT", "boss");
   resolveBossEvent();
 }
 
@@ -831,14 +846,31 @@ function scaleChanges(changes, multiplier) {
 function resolveBossDamage() {
   const total = calculateTotalAssets();
   const gain = total - gameState.lastTurnAssets;
-  const damage = Math.max(0, Math.floor(gain));
-  if (damage > 0) {
+  const baseDamage = Math.max(0, Math.floor(gain));
+  if (baseDamage > 0) {
+    gameState.damageCombo += 1;
+    const multiplier = getDamageComboMultiplier();
+    const damage = Math.floor(baseDamage * multiplier);
+    const hpBefore = gameState.bossHp;
     gameState.bossHp = Math.max(0, gameState.bossHp - damage);
-    addLog(`利益 ${formatYen(damage)} がボスへのダメージになりました。残HP ${formatYen(gameState.bossHp)}。`);
+    gameState.lastDamage = damage;
+    gameState.stageDamage += damage;
+    gameState.lastOverkill = Math.max(0, damage - hpBefore);
+    addLog(`利益 ${formatYen(baseDamage)} × COMBO ${multiplier.toFixed(2)} = <strong>${formatYen(damage)}</strong> ダメージ。残HP ${formatYen(gameState.bossHp)}。`);
+    triggerImpact(`${formatYen(damage)} DAMAGE`, "damage");
+    pulseElement(elements.bossHpFill, "hit");
   } else {
+    gameState.damageCombo = 0;
+    gameState.lastDamage = 0;
+    gameState.lastOverkill = 0;
     addLog("前ターン比の利益がないため、ボスへのダメージは0。");
+    triggerImpact("NO DAMAGE", "miss");
   }
   gameState.lastTurnAssets = total;
+}
+
+function getDamageComboMultiplier() {
+  return Math.min(2, 1 + Math.max(0, gameState.damageCombo - 1) * 0.25);
 }
 
 function resolveStageEnd() {
@@ -850,6 +882,8 @@ function resolveStageEnd() {
   }
 
   addLog(`<strong>${getCurrentStage().bossName}</strong> を撃破。ステージクリア。`);
+  triggerImpact(gameState.lastOverkill > 0 ? `OVERKILL +${formatYen(gameState.lastOverkill)}` : "BOSS BREAK", "clear");
+  pulseElement(document.body, "screen-burst");
   if (gameState.stageIndex >= MAX_STAGES - 1) {
     finishGame();
     render();
@@ -870,8 +904,9 @@ function confirmStageReward() {
   if (!hasPassive(gameState.selectedRewardPassive)) {
     gameState.passives.push(gameState.selectedRewardPassive);
   }
-  gameState.cash += gameState.pendingReward.cashBonus;
-  addLog(`報酬: ${CARD_DEFINITIONS[gameState.selectedRewardCard].name} / ${PASSIVE_DEFINITIONS[gameState.selectedRewardPassive].name} / 現金 ${formatYen(gameState.pendingReward.cashBonus)} を獲得。`);
+  const overkillBonus = Math.min(Math.floor(gameState.lastOverkill * 0.15), getCurrentStage().hp);
+  gameState.cash += gameState.pendingReward.cashBonus + overkillBonus;
+  addLog(`報酬: ${CARD_DEFINITIONS[gameState.selectedRewardCard].name} / ${PASSIVE_DEFINITIONS[gameState.selectedRewardPassive].name} / 現金 ${formatYen(gameState.pendingReward.cashBonus)} / オーバーキル ${formatYen(overkillBonus)} を獲得。`);
 
   gameState.waitingForReward = false;
   gameState.pendingReward = null;
@@ -918,6 +953,7 @@ function buyShares(symbol, sharesToBuy, source = "買付") {
   stock.shares += totalShares;
   gameState.cash -= cost;
   addLog(`${source}: ${stock.name}を${totalShares}株購入。約定代金 ${formatYen(subtotal)} / 手数料 ${formatYen(fee)}。`);
+  triggerImpact(`BUY ${stock.name}`, "trade");
   return true;
 }
 
@@ -949,6 +985,7 @@ function sellShares(symbol, sharesToSell, source = "売却") {
   }
   gameState.cash += revenue;
   addLog(`${source}: ${stock.name}を${sharesToSell}株売却。受取 ${formatYen(revenue)} / 手数料 ${formatYen(fee)}。`);
+  triggerImpact(`SELL ${stock.name}`, "trade");
   return true;
 }
 
@@ -1420,6 +1457,10 @@ function renderStageInfo() {
   elements.stageStartText.textContent = gameState.started ? formatYen(gameState.stageStartAssets) : "-";
   elements.stageProfitText.textContent = gameState.started ? formatYen(profit) : "-";
   elements.stageProfitText.className = profit >= 0 ? "positive" : "negative";
+  elements.lastDamageText.textContent = gameState.started ? formatYen(gameState.lastDamage) : "-";
+  elements.lastDamageText.className = gameState.lastDamage > 0 ? "positive damage-text" : "neutral";
+  elements.comboText.textContent = gameState.started ? `${gameState.damageCombo} HIT ×${getDamageComboMultiplier().toFixed(2)}` : "-";
+  elements.comboText.className = gameState.damageCombo >= 2 ? "combo-hot" : "neutral";
   elements.bossOmenText.textContent = gameState.currentOmen || "-";
   elements.passiveList.innerHTML = renderPassiveList();
 }
@@ -1630,6 +1671,33 @@ function changeClass(value) {
   if (value > 0) return "positive";
   if (value < 0) return "negative";
   return "neutral";
+}
+
+function triggerImpact(text, type) {
+  if (!elements.impactLayer) return;
+  elements.impactLayer.textContent = text;
+  elements.impactLayer.className = `impact-layer impact-${type}`;
+  if (typeof window !== "undefined") {
+    window.clearTimeout(triggerImpact.timer);
+    triggerImpact.timer = window.setTimeout(() => {
+      elements.impactLayer.classList.add("hidden");
+    }, 920);
+  }
+}
+
+function triggerDelayedImpact(text, type) {
+  if (typeof window === "undefined") return;
+  window.clearTimeout(triggerDelayedImpact.timer);
+  triggerDelayedImpact.timer = window.setTimeout(() => triggerImpact(text, type), 980);
+}
+
+function pulseElement(element, className) {
+  if (!element || !element.classList || typeof window === "undefined") return;
+  element.classList.remove(className);
+  window.requestAnimationFrame(() => {
+    element.classList.add(className);
+    window.setTimeout(() => element.classList.remove(className), 520);
+  });
 }
 
 elements.startButton.addEventListener("click", resetGame);

@@ -280,6 +280,7 @@ button:disabled {
 .boss-hp-fill {
   width: 0%;
   height: 100%;
+  transition: width 360ms steps(8), filter 160ms steps(2);
   background: repeating-linear-gradient(
     90deg,
     #ff3c38 0,
@@ -287,6 +288,10 @@ button:disabled {
     #b8171b 8px,
     #b8171b 16px
   );
+}
+
+.boss-hp-fill.hit {
+  filter: brightness(2.4);
 }
 
 .omen-box {
@@ -502,6 +507,12 @@ button:disabled {
   text-shadow: 2px 2px 0 #03230a;
 }
 
+.damage-text,
+.combo-hot {
+  color: var(--yellow);
+  text-shadow: 2px 2px 0 #3a1d00, 0 0 10px rgba(255, 209, 59, 0.7);
+}
+
 .negative {
   color: var(--red);
   text-shadow: 2px 2px 0 #2c0304;
@@ -560,6 +571,12 @@ button:disabled {
   color: #f3f7ef;
   box-shadow: 0 0 0 2px #05070b, 0 6px 0 rgba(0, 0, 0, 0.56);
   text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.9);
+  transition: transform 120ms steps(2), filter 120ms steps(2);
+}
+
+.card:not(.disabled):hover {
+  transform: translateY(-6px);
+  filter: brightness(1.22);
 }
 
 .card::before {
@@ -660,6 +677,12 @@ button:disabled {
   color: var(--green);
   font-weight: 800;
   text-shadow: 2px 2px 0 #03230a;
+}
+
+button:active,
+.card:not(.disabled):active,
+.passive-option:active {
+  transform: translateY(3px);
 }
 
 .card.disabled {
@@ -768,4 +791,99 @@ button:disabled {
 
 .result-card button {
   margin-top: 12px;
+}
+
+.impact-layer {
+  position: fixed;
+  left: 50%;
+  top: 18%;
+  z-index: 20;
+  transform: translateX(-50%);
+  min-width: 360px;
+  border: 3px solid var(--yellow);
+  background: #05070b;
+  color: var(--yellow);
+  padding: 18px 24px;
+  text-align: center;
+  font-size: 30px;
+  font-weight: 900;
+  text-shadow: 3px 3px 0 #3a1d00;
+  box-shadow: 0 0 0 3px #05070b, 0 0 0 6px rgba(255, 209, 59, 0.72), 0 12px 0 rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+  animation: impact-pop 900ms steps(8) both;
+}
+
+.impact-layer.hidden {
+  display: none;
+}
+
+.impact-damage {
+  border-color: var(--green);
+  color: var(--green);
+  text-shadow: 3px 3px 0 #03230a;
+  box-shadow: 0 0 0 3px #05070b, 0 0 0 6px rgba(67, 227, 93, 0.7), 0 12px 0 rgba(0, 0, 0, 0.5);
+}
+
+.impact-miss {
+  border-color: var(--line-bright);
+  color: var(--muted);
+}
+
+.impact-clear {
+  border-color: var(--yellow);
+  color: var(--yellow);
+  animation: impact-pop 1100ms steps(8) both, impact-flash 220ms steps(2) 4;
+}
+
+.impact-warning,
+.impact-boss {
+  border-color: var(--red);
+  color: var(--red);
+  text-shadow: 3px 3px 0 #2c0304;
+  box-shadow: 0 0 0 3px #05070b, 0 0 0 6px rgba(255, 60, 56, 0.72), 0 12px 0 rgba(0, 0, 0, 0.5);
+}
+
+.impact-boss {
+  animation: impact-pop 1000ms steps(8) both, impact-flash 180ms steps(2) 5;
+}
+
+.impact-card,
+.impact-trade {
+  font-size: 22px;
+}
+
+.screen-burst {
+  animation: screen-burst 520ms steps(5);
+}
+
+@keyframes impact-pop {
+  0% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(18px) scale(0.82);
+  }
+  18% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1.08);
+  }
+  72% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-16px) scale(0.96);
+  }
+}
+
+@keyframes impact-flash {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.8); }
+}
+
+@keyframes screen-burst {
+  0%, 100% { filter: none; transform: translate(0, 0); }
+  20% { filter: brightness(1.35); transform: translate(4px, 0); }
+  40% { transform: translate(-4px, 2px); }
+  60% { transform: translate(3px, -2px); }
+  80% { transform: translate(-2px, 0); }
 }

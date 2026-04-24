@@ -75,6 +75,14 @@
           <span>現在のステージ利益</span>
           <strong id="stageProfitText">-</strong>
         </div>
+        <div class="stage-stat">
+          <span>直近ダメージ</span>
+          <strong id="lastDamageText">-</strong>
+        </div>
+        <div class="stage-stat">
+          <span>Profit Combo</span>
+          <strong id="comboText">-</strong>
+        </div>
         <div class="omen-box">
           <span>次のボス予兆</span>
           <strong id="bossOmenText">ゲーム開始後に表示されます。</strong>
@@ -183,6 +191,8 @@
       <button id="resultRestartButton" class="primary-button">もう一度プレイ</button>
     </div>
   </div>
+
+  <div id="impactLayer" class="impact-layer hidden"></div>
 
   <script src="main.js"></script>
 </body>
