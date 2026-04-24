@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stock Roguelike</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">Stock Roguelike</p>
+        <h1>個人投資家ローグライク</h1>
+      </div>
+      <div class="top-actions">
+        <button id="startButton" class="primary-button">ゲーム開始</button>
+        <button id="restartButton" class="ghost-button">リスタート</button>
+      </div>
+    </header>
+
+    <section id="statusPanel" class="status-grid">
+      <div class="metric">
+        <span>ターン</span>
+        <strong id="turnText">-</strong>
+      </div>
+      <div class="metric">
+        <span>現金</span>
+        <strong id="cashText">-</strong>
+      </div>
+      <div class="metric">
+        <span>保有株評価額</span>
+        <strong id="stockValueText">-</strong>
+      </div>
+      <div class="metric total">
+        <span>総資産</span>
+        <strong id="totalAssetText">-</strong>
+      </div>
+    </section>
+
+    <main class="game-layout">
+      <section class="market-panel panel">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">Market Board</p>
+            <h2>銘柄一覧</h2>
+          </div>
+          <div id="effectBadges" class="effect-badges"></div>
+        </div>
+
+        <table class="stock-table">
+          <thead>
+            <tr>
+              <th>銘柄</th>
+              <th>株価</th>
+              <th>前ターン比</th>
+              <th>保有株数</th>
+              <th>評価額</th>
+            </tr>
+          </thead>
+          <tbody id="stockTableBody"></tbody>
+        </table>
+      </section>
+
+      <aside class="log-panel panel">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">News Feed</p>
+            <h2>市場ニュースログ</h2>
+          </div>
+        </div>
+        <div id="logList" class="log-list"></div>
+      </aside>
+
+      <section class="hand-panel panel">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">Your Hand</p>
+            <h2>手札カード</h2>
+          </div>
+          <div class="turn-controls">
+            <span id="playedCountText">使用済み 0 / 2</span>
+            <button id="endTurnButton" class="primary-button">ターン終了</button>
+          </div>
+        </div>
+        <div id="handCards" class="card-grid"></div>
+      </section>
+    </main>
+  </div>
+
+  <div id="rewardModal" class="modal hidden">
+    <div class="modal-card">
+      <p class="eyebrow">Deck Builder</p>
+      <h2>デッキに追加するカードを選択</h2>
+      <div id="rewardCards" class="reward-grid"></div>
+    </div>
+  </div>
+
+  <div id="resultModal" class="modal hidden">
+    <div class="modal-card result-card">
+      <p class="eyebrow" id="resultLabel">Result</p>
+      <h2 id="resultTitle">ゲーム終了</h2>
+      <p id="resultMessage"></p>
+      <button id="resultRestartButton" class="primary-button">もう一度プレイ</button>
+    </div>
+  </div>
+
+  <script src="main.js"></script>
+</body>
+</html>
