@@ -889,6 +889,21 @@ button:disabled {
   font-weight: 800;
 }
 
+.card-cost {
+  align-self: flex-start;
+  min-width: 28px;
+  height: 28px;
+  border: 2px solid var(--yellow);
+  background: #2a2209;
+  color: var(--yellow);
+  display: inline-grid;
+  place-items: center;
+  font-size: 15px;
+  font-weight: 900;
+  text-shadow: 2px 2px 0 #05070b;
+  box-shadow: 0 0 0 2px #05070b;
+}
+
 .rare .rarity {
   color: var(--blue);
 }
@@ -1305,4 +1320,391 @@ button:active,
   40% { transform: translate(-4px, 2px); }
   60% { transform: translate(3px, -2px); }
   80% { transform: translate(-2px, 0); }
+}
+
+/* One-screen combat layout: keep decisions visible, move secondary data into chips/tooltips. */
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  min-width: 0;
+}
+
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  width: min(1440px, calc(100vw - 16px));
+  height: 100vh;
+  min-height: 0;
+  padding: 8px 0;
+  overflow: hidden;
+}
+
+.topbar {
+  min-height: 54px;
+  margin-bottom: 8px;
+  padding: 8px 14px;
+}
+
+.topbar h1 {
+  font-size: 20px;
+}
+
+.topbar .eyebrow {
+  display: none;
+}
+
+.top-actions,
+.turn-controls {
+  gap: 8px;
+}
+
+.primary-button,
+.ghost-button {
+  min-height: 34px;
+  padding: 0 12px;
+}
+
+.status-grid {
+  grid-template-columns: 0.8fr 0.9fr 0.8fr 1.2fr 1.2fr 1.3fr;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.metric {
+  min-height: 44px;
+  padding: 6px 8px;
+  box-shadow: 0 0 0 2px #05070b;
+}
+
+.metric span {
+  margin-bottom: 2px;
+  font-size: 10px;
+}
+
+.metric strong {
+  font-size: 14px;
+}
+
+.game-layout {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  grid-template-columns: 260px minmax(0, 1fr) 280px;
+  grid-template-areas:
+    "stage market log"
+    "trade hand hand";
+  grid-template-rows: minmax(0, 1fr) 302px;
+  gap: 8px;
+}
+
+.panel {
+  min-height: 0;
+  box-shadow: 0 0 0 2px #05070b;
+}
+
+.panel-header {
+  padding: 8px 10px;
+}
+
+.panel h2,
+.modal-card h2 {
+  font-size: 16px;
+}
+
+.eyebrow {
+  margin-bottom: 3px;
+  font-size: 10px;
+}
+
+.stage-panel,
+.market-panel,
+.log-panel,
+.hand-panel,
+.trade-panel {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.stage-grid {
+  flex: 1;
+  min-height: 0;
+  grid-template-columns: 1fr;
+  align-content: start;
+  gap: 8px;
+  padding: 8px;
+  overflow: hidden;
+}
+
+.boss-name {
+  min-width: 0;
+  text-align: right;
+}
+
+.boss-name strong {
+  font-size: 14px;
+}
+
+.boss-hp-block,
+.stage-stat,
+.omen-box,
+.passive-box {
+  padding: 10px;
+}
+
+.boss-hp-bar {
+  height: 18px;
+}
+
+.stage-stat {
+  min-height: 58px;
+}
+
+.boss-detail-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.boss-detail-row span {
+  flex: 1 1 calc(50% - 6px);
+  border: 2px solid var(--line);
+  background: #071018;
+  padding: 5px 6px;
+  color: var(--yellow);
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.35;
+  cursor: help;
+  text-shadow: 2px 2px 0 #05070b;
+}
+
+.boss-detail-row strong {
+  display: block;
+  color: var(--text);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.omen-box strong {
+  max-height: 78px;
+  overflow: auto;
+  font-size: 13px;
+}
+
+.passive-box {
+  min-height: 82px;
+  overflow: hidden;
+}
+
+.passive-list {
+  max-height: 58px;
+  overflow: auto;
+}
+
+.passive-chip,
+.empty-inline {
+  padding: 4px 6px;
+  font-size: 10px;
+}
+
+.market-panel {
+  min-width: 0;
+}
+
+.chart-screen {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+}
+
+.price-strip {
+  grid-template-columns: 1.2fr 0.8fr 0.7fr;
+  gap: 8px;
+}
+
+.position-grid {
+  gap: 8px;
+}
+
+.price-main,
+.price-chip,
+.position-grid > div {
+  min-height: 48px;
+  padding: 7px 9px;
+}
+
+.price-main span,
+.price-chip span,
+.position-grid span {
+  margin-bottom: 3px;
+  font-size: 10px;
+}
+
+.price-main strong {
+  font-size: 22px;
+}
+
+.price-chip strong,
+.position-grid strong {
+  font-size: 14px;
+}
+
+.price-chart {
+  flex: 1;
+  min-height: 150px;
+}
+
+.price-chart svg {
+  height: 100%;
+}
+
+.effect-badges {
+  max-width: 420px;
+  gap: 5px;
+}
+
+.badge {
+  padding: 4px 6px;
+  font-size: 10px;
+}
+
+.log-panel {
+  height: auto;
+  min-height: 0;
+}
+
+.log-list {
+  flex: 1;
+  max-height: none;
+  min-height: 0;
+  gap: 6px;
+  padding: 8px;
+}
+
+.log-item {
+  padding: 7px 8px;
+  font-size: 11px;
+}
+
+.trade-form {
+  flex: 1;
+  gap: 7px;
+  padding: 8px;
+  overflow: auto;
+}
+
+.trade-form select,
+.trade-form input {
+  height: 34px;
+}
+
+.trade-buttons button,
+.read-buttons button {
+  min-height: 32px;
+}
+
+.read-control {
+  padding: 8px;
+}
+
+.read-hint,
+.trade-hint {
+  font-size: 10px;
+}
+
+.hand-panel {
+  min-width: 0;
+}
+
+.hand-panel .panel-header {
+  flex: 0 0 auto;
+}
+
+.deck-panel-inline {
+  flex: 0 0 auto;
+  padding: 7px 10px 0;
+}
+
+.deck-summary {
+  margin-bottom: 5px;
+  font-size: 10px;
+}
+
+.deck-list {
+  max-height: 32px;
+  padding-bottom: 6px;
+}
+
+.deck-pill,
+.deck-empty {
+  padding: 3px 5px;
+  font-size: 10px;
+}
+
+.deck-pill .pixel-icon {
+  width: 18px;
+  height: 18px;
+}
+
+.card-grid {
+  flex: 1;
+  min-height: 0;
+  grid-template-columns: repeat(3, minmax(180px, 1fr));
+  align-items: stretch;
+  gap: 8px;
+  padding: 8px 14px 12px;
+  overflow: hidden;
+}
+
+.card {
+  min-height: 0;
+  padding: 18px 14px 14px;
+}
+
+.card::before {
+  inset: 10px;
+}
+
+.card-top {
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.card h3 {
+  font-size: 14px;
+}
+
+.card-cost {
+  min-width: 24px;
+  height: 24px;
+  font-size: 13px;
+}
+
+.rarity {
+  padding: 3px 5px;
+  font-size: 10px;
+}
+
+.card p {
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.card button {
+  min-height: 34px;
+  margin-top: auto;
+}
+
+.pixel-icon {
+  width: 34px;
+  height: 34px;
+  flex-basis: 34px;
 }

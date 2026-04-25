@@ -4,7 +4,7 @@ const MAX_STAGES = 5;
 const STAGE_TURNS = 4;
 const MAX_TURNS = MAX_STAGES * STAGE_TURNS;
 const INITIAL_CASH = 1000000;
-const MAX_CARDS_PER_TURN = 2;
+const BASE_ENERGY = 3;
 const TRANSACTION_FEE_RATE = 0.001;
 
 const STOCK_TEMPLATES = [
@@ -131,11 +131,6 @@ const PASSIVE_DEFINITIONS = {
     id: "riskManagement",
     name: "リスク管理",
     description: "ステージ中に一度だけ、最大損失を半分にする。"
-  },
-  infoNetwork: {
-    id: "infoNetwork",
-    name: "情報網",
-    description: "ボスイベントの方向性が1ターン早くわかる。"
   },
   longTerm: {
     id: "longTerm",
@@ -533,7 +528,6 @@ const ICON_INDEX = {
   diversifiedInvestor: 24,
   contrarian: 25,
   riskManagement: 26,
-  infoNetwork: 27,
   longTerm: 28,
   gambler: 29,
   compoundSeed: 30,
@@ -547,7 +541,8 @@ const ICON_INDEX = {
   chart: 38,
   overheat: 39,
   guardBreak: 37,
-  taxShelter: 23
+  taxShelter: 23,
+  energyCore: 31
 };
 
 const ICON_COLUMNS = 8;
@@ -588,6 +583,8 @@ const gameState = {
   discardPile: [],
   hand: [],
   playedThisTurn: 0,
+  energy: BASE_ENERGY,
+  maxEnergy: BASE_ENERGY,
   nextDrawBonus: 0,
   effects: {
     margin: false,
@@ -703,6 +700,8 @@ function resetGame() {
   gameState.discardPile = [];
   gameState.hand = [];
   gameState.playedThisTurn = 0;
+  gameState.energy = BASE_ENERGY;
+  gameState.maxEnergy = BASE_ENERGY;
   gameState.nextDrawBonus = 0;
   gameState.marketRead = "neutral";
   gameState.readStreak = 0;
@@ -739,6 +738,8 @@ function startTurn() {
   if (gameState.gameOver) return;
 
   gameState.playedThisTurn = 0;
+  gameState.maxEnergy = getMaxEnergy();
+  gameState.energy = gameState.maxEnergy;
   gameState.effects.margin = false;
   gameState.marketRead = "neutral";
   prepareStageTurnOmen();
@@ -754,7 +755,7 @@ function startTurn() {
   const drawCount = 3 + gameState.nextDrawBonus + relicDrawBonus + (getCurrentRoute().drawBonus || 0);
   gameState.nextDrawBonus = 0;
   drawCards(drawCount);
-  addLog(`<strong>Stage ${gameState.stageIndex + 1}-${gameState.stageTurn}</strong> 開始。手札を${drawCount}枚引きました。`);
+  addLog(`<strong>Stage ${gameState.stageIndex + 1}-${gameState.stageTurn}</strong> 開始。手札を${drawCount}枚引き、行動力${gameState.energy}を得ました。`);
   render();
 }
 
@@ -772,7 +773,6 @@ function drawCards(count) {
 
 function useCard(instanceId, target) {
   if (!gameState.started || gameState.gameOver || gameState.waitingForReward) return;
-  if (gameState.playedThisTurn >= MAX_CARDS_PER_TURN) return;
 
   const handIndex = gameState.hand.findIndex((card) => card.instanceId === instanceId);
   if (handIndex === -1) return;
@@ -781,6 +781,7 @@ function useCard(instanceId, target) {
   const card = CARD_DEFINITIONS[cardInstance.cardId];
   if (!canUseCard(card, target)) return;
 
+  gameState.energy -= getCardCost(card);
   card.use(target);
   gameState.hand.splice(handIndex, 1);
   if (card.exhaustOnUse) {
@@ -900,18 +901,12 @@ function createBossPlan(stageIndex) {
 
 function createStageStartOmen() {
   const stage = getCurrentStage();
-  if (hasPassive("infoNetwork")) {
-    const target = getKnownBossTarget();
-    if (target) return `情報網: 次のボス対象は ${findStock(target).name}。Stage ${gameState.stageIndex + 1}「${stage.name}」への準備を。`;
-  }
   return `Stage ${gameState.stageIndex + 1}「${stage.name}」開幕。テーマは「${stage.theme}」。`;
 }
 
 function prepareStageTurnOmen() {
   if (gameState.stageTurn === 1) {
-    if (!hasPassive("infoNetwork")) {
-      gameState.currentOmen = createStageStartOmen();
-    }
+    gameState.currentOmen = createStageStartOmen();
     return;
   }
 
@@ -962,11 +957,6 @@ function createBossOmen() {
   return precise
     ? "ブラックマンデー後、市場価格に大反発の買いが入りそう。暴落前の現金と暴落耐性が鍵。"
     : "全面暴落の予兆。ただし暴落後に強い反発資金が向かう気配。";
-}
-
-function getKnownBossTarget() {
-  if (!gameState.bossPlan) return null;
-  return gameState.bossPlan.target;
 }
 
 function resolveStageTurnEvent() {
@@ -1533,6 +1523,11 @@ const RELIC_DEFINITIONS = [
     id: "taxShelter",
     name: "節税口座",
     description: "短期利確税を半減する。細かい利確をビルドとして成立させやすくする。"
+  },
+  {
+    id: "energyCore",
+    name: "黄金の証券印",
+    description: "毎ターンの行動力が1増える。高コストカードを連打しやすくなる。"
   }
 ];
 
@@ -1749,9 +1744,19 @@ function updateRewardConfirmState() {
 }
 
 function canUseCard(card, target) {
-  if (gameState.playedThisTurn >= MAX_CARDS_PER_TURN) return false;
+  if (gameState.energy < getCardCost(card)) return false;
   const targets = getTargetsForCard(card);
   return card.target === "none" || targets.some((stock) => stock.symbol === target);
+}
+
+function getMaxEnergy() {
+  return BASE_ENERGY + (hasRelic("energyCore") ? 1 : 0);
+}
+
+function getCardCost(card) {
+  if (Number.isFinite(card.cost)) return card.cost;
+  if (card.rarity === "Epic") return 2;
+  return 1;
 }
 
 function getTargetsForCard(card) {
@@ -1873,7 +1878,7 @@ function renderStatus() {
   elements.totalAssetText.textContent = formatYen(totalAssets);
   elements.stockValueText.className = stockValue > 0 ? "positive" : "neutral";
   elements.totalAssetText.className = gameState.started ? changeClass(stageProfit) : "neutral";
-  elements.playedCountText.textContent = `使用済み ${gameState.playedThisTurn} / ${MAX_CARDS_PER_TURN}`;
+  elements.playedCountText.textContent = `行動力 ${gameState.energy} / ${gameState.maxEnergy}`;
 }
 
 function renderStageInfo() {
@@ -2073,7 +2078,7 @@ function renderHand() {
     const card = CARD_DEFINITIONS[cardInstance.cardId];
     const cardElement = createCardElement(card, {
       instanceId: cardInstance.instanceId,
-      disabled: gameState.playedThisTurn >= MAX_CARDS_PER_TURN || gameState.waitingForReward || gameState.gameOver,
+      disabled: gameState.waitingForReward || gameState.gameOver || gameState.energy < getCardCost(card),
       onClick: useCard
     });
     elements.handCards.appendChild(cardElement);
@@ -2219,7 +2224,7 @@ function createCardElement(card, options) {
   const element = document.createElement("article");
   element.className = `card ${card.rarity.toLowerCase()} ${getCardFrameClass(card)}`;
   element.setAttribute("data-tooltip-title", card.name);
-  element.setAttribute("data-tooltip-meta", `${card.rarity} / ${card.category}`);
+  element.setAttribute("data-tooltip-meta", `${card.rarity} / ${card.category} / Cost ${getCardCost(card)}`);
   element.setAttribute("data-tooltip", card.description);
 
   const targets = getTargetsForCard(card);
@@ -2233,6 +2238,7 @@ function createCardElement(card, options) {
         <p class="eyebrow">${card.category}</p>
         <h3>${card.name}</h3>
       </div>
+      <span class="card-cost" title="行動力コスト">${getCardCost(card)}</span>
       <span class="rarity">${card.rarity}</span>
     </div>
     <p>${card.description}</p>

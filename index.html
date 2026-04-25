@@ -70,28 +70,15 @@
           </div>
         </div>
         <div class="stage-stat">
-          <span>ステージ開始時総資産</span>
-          <strong id="stageStartText">-</strong>
-        </div>
-        <div class="stage-stat">
           <span>現在のステージ利益</span>
           <strong id="stageProfitText">-</strong>
         </div>
-        <div class="stage-stat">
-          <span>現在ルート</span>
-          <strong id="routeText">標準</strong>
-        </div>
-        <div class="stage-stat">
-          <span>直近ダメージ</span>
-          <strong id="lastDamageText">-</strong>
-        </div>
-        <div class="stage-stat">
-          <span>ボスガード</span>
-          <strong id="bossGuardText">-</strong>
-        </div>
-        <div class="stage-stat">
-          <span>Profit Combo</span>
-          <strong id="comboText">-</strong>
+        <div class="boss-detail-row">
+          <span data-tooltip-title="開始資産" data-tooltip-meta="Stage" data-tooltip="このステージ開始時の総資産。ステージ利益の基準です。">開始 <strong id="stageStartText">-</strong></span>
+          <span data-tooltip-title="直近ダメージ" data-tooltip-meta="Damage" data-tooltip="前ターン終了時にボスへ与えたダメージです。">DMG <strong id="lastDamageText">-</strong></span>
+          <span data-tooltip-title="ボスガード" data-tooltip-meta="Guard" data-tooltip="毎ターンの小さい利益ダメージを吸収します。">Guard <strong id="bossGuardText">-</strong></span>
+          <span data-tooltip-title="Profit Combo" data-tooltip-meta="Combo" data-tooltip="連続して利益を出すとダメージ倍率が上がります。">Combo <strong id="comboText">-</strong></span>
+          <span data-tooltip-title="現在ルート" data-tooltip-meta="Route" data-tooltip="ステージ報酬で選んだ次ルート効果です。">Route <strong id="routeText">標準</strong></span>
         </div>
         <div class="omen-box">
           <span>次のボス予兆</span>
@@ -204,7 +191,7 @@
             <h2>手札カード</h2>
           </div>
           <div class="turn-controls">
-            <span id="playedCountText">使用済み 0 / 2</span>
+            <span id="playedCountText">行動力 0 / 3</span>
             <button id="endTurnButton" class="primary-button">ターン終了</button>
           </div>
         </div>
