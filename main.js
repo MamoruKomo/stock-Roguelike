@@ -397,6 +397,18 @@ const CARD_DEFINITIONS = {
       addLog("分岐ルートを確保。次の市場イベントは2候補から有利な方を選びます。");
     }
   },
+  tapeReading: {
+    id: "tapeReading",
+    name: "板読み",
+    rarity: "Rare",
+    category: "読み",
+    description: "次に相場読みが的中した時の追加ダメージを2倍にする。",
+    target: "none",
+    use() {
+      gameState.effects.readBoostCharges += 1;
+      addLog("板読みを準備。次の相場読み的中ボーナスが2倍になります。");
+    }
+  },
   guardBreak: {
     id: "guardBreak",
     name: "ガードブレイク",
@@ -455,6 +467,7 @@ const REWARD_POOL = [
   "relicHunt",
   "deckThin",
   "marketBranch",
+  "tapeReading",
   "guardBreak"
 ];
 
@@ -513,6 +526,7 @@ const ICON_INDEX = {
   relicHunt: 18,
   deckThin: 19,
   marketBranch: 20,
+  tapeReading: 38,
   curse: 21,
   analysis: 22,
   feeCut: 23,
@@ -565,6 +579,8 @@ const gameState = {
   selectedRewardPassive: null,
   selectedRewardRoute: null,
   stageRiskUsed: false,
+  marketRead: "neutral",
+  readStreak: 0,
   cash: INITIAL_CASH,
   stocks: [],
   deck: [],
@@ -579,6 +595,7 @@ const gameState = {
     crashGuards: 0,
     upsideBoostCharges: 0,
     marketChoiceCharges: 0,
+    readBoostCharges: 0,
     guardBreakCharges: 0
   },
   relics: [],
@@ -624,6 +641,9 @@ const elements = {
   unrealizedProfitText: document.getElementById("unrealizedProfitText"),
   tradeStockSelect: document.getElementById("tradeStockSelect"),
   tradeSharesInput: document.getElementById("tradeSharesInput"),
+  readButtons: document.getElementById("readButtons"),
+  readStreakText: document.getElementById("readStreakText"),
+  readHint: document.getElementById("readHint"),
   buySharesButton: document.getElementById("buySharesButton"),
   sellSharesButton: document.getElementById("sellSharesButton"),
   maxBuyButton: document.getElementById("maxBuyButton"),
@@ -684,12 +704,15 @@ function resetGame() {
   gameState.hand = [];
   gameState.playedThisTurn = 0;
   gameState.nextDrawBonus = 0;
+  gameState.marketRead = "neutral";
+  gameState.readStreak = 0;
   gameState.effects = {
     margin: false,
     diversifyCharges: 0,
     crashGuards: 0,
     upsideBoostCharges: 0,
     marketChoiceCharges: 0,
+    readBoostCharges: 0,
     guardBreakCharges: 0
   };
   gameState.relics = [];
@@ -717,6 +740,7 @@ function startTurn() {
 
   gameState.playedThisTurn = 0;
   gameState.effects.margin = false;
+  gameState.marketRead = "neutral";
   prepareStageTurnOmen();
   if (getCurrentRoute().freeHedge) {
     gameState.effects.diversifyCharges += 1;
@@ -790,6 +814,7 @@ function endTurn() {
   resolvePassiveEndOfTurnEffects();
   resolveEndOfTurnRelics();
   resolveOverheatCorrections();
+  resolveMarketRead();
 
   gameState.effects.margin = false;
   resolveBossDamage();
@@ -1065,6 +1090,52 @@ function scaleChanges(changes, multiplier) {
   return Object.fromEntries(
     Object.entries(changes).map(([symbol, percent]) => [symbol, percent * multiplier])
   );
+}
+
+function resolveMarketRead() {
+  const stock = gameState.stocks[0];
+  if (!stock || stock.previousPrice <= 0) return;
+
+  const change = (stock.price - stock.previousPrice) / stock.previousPrice;
+  const read = gameState.marketRead || "neutral";
+  const correct =
+    (read === "bull" && change >= 0.05) ||
+    (read === "bear" && change <= -0.05) ||
+    (read === "neutral" && Math.abs(change) < 0.05);
+
+  if (!correct) {
+    if (read !== "neutral" || Math.abs(change) >= 0.05) {
+      addLog(`相場読み失敗: ${getReadLabel(read)} に対して、実際の値動きは ${formatPercent(change)}。`);
+    }
+    gameState.readStreak = 0;
+    return;
+  }
+
+  gameState.readStreak += 1;
+  let bonus = 18000 + gameState.stageIndex * 12000 + Math.max(0, gameState.readStreak - 1) * 10000;
+  if (read === "bear" && getCashRatio() >= 0.30) {
+    bonus += 20000;
+    gameState.effects.diversifyCharges += 1;
+    addLog("弱気読み的中: 現金余力を残していたため、次の下落半減を1回獲得。");
+  }
+  if (read === "neutral") {
+    bonus = Math.floor(bonus * 0.65);
+    gameState.nextDrawBonus += 1;
+    addLog("中立読み的中: 次ターンのドローが1枚増加。");
+  }
+  if (gameState.effects.readBoostCharges > 0) {
+    gameState.effects.readBoostCharges -= 1;
+    bonus *= 2;
+    addLog("板読み発動: 相場読みボーナスが2倍。");
+  }
+
+  addBonusDamage(bonus, `相場読み的中 ${gameState.readStreak}HIT (${getReadLabel(read)} / ${formatPercent(change)})`);
+}
+
+function getReadLabel(read) {
+  if (read === "bull") return "強気";
+  if (read === "bear") return "弱気";
+  return "中立";
 }
 
 function resolveBossDamage() {
@@ -1951,6 +2022,7 @@ function renderTradePanel() {
   elements.maxSellButton.disabled = disabled || maxSell <= 0;
   elements.tradeSharesInput.disabled = disabled;
   elements.tradeStockSelect.disabled = disabled;
+  renderMarketReadControls(disabled);
 
   if (!stock) {
     elements.tradeHint.textContent = "ゲーム開始後、口数を指定していつでも売買できます。";
@@ -1958,6 +2030,32 @@ function renderTradePanel() {
   }
 
   elements.tradeHint.textContent = `買付可能 ${maxBuy.toLocaleString("ja-JP")}口 / 売却可能 ${maxSell.toLocaleString("ja-JP")}口 / 平均取得 ${formatYen(stock.averageCost || 0)}`;
+}
+
+function renderMarketReadControls(disabled) {
+  if (!elements.readButtons) return;
+  elements.readStreakText.textContent = `${gameState.readStreak} HIT`;
+  elements.readStreakText.className = gameState.readStreak >= 2 ? "combo-hot" : "neutral";
+  const hints = {
+    bull: "5%以上の上昇を読む。的中で追加ダメージ。",
+    bear: "5%以上の下落を読む。現金30%以上なら防御も得る。",
+    neutral: "小動きを読む。的中で次ターン+1ドロー。"
+  };
+  elements.readHint.textContent = hints[gameState.marketRead] || hints.neutral;
+  const buttons = elements.readButtons.querySelectorAll ? elements.readButtons.querySelectorAll("button") : elements.readButtons.children;
+  [...buttons].forEach((button) => {
+    const isSelected = button.dataset.read === gameState.marketRead;
+    button.classList.toggle("selected", isSelected);
+    button.disabled = disabled;
+  });
+}
+
+function setMarketRead(read) {
+  if (!["bull", "bear", "neutral"].includes(read)) return;
+  if (!gameState.started || gameState.gameOver || gameState.waitingForReward) return;
+  gameState.marketRead = read;
+  addLog(`相場読みを <strong>${getReadLabel(read)}</strong> に設定。`);
+  render();
 }
 
 function renderHand() {
@@ -2089,6 +2187,7 @@ function renderCompendium() {
       title: "重要システム",
       entries: [
         { id: "bossGuard", name: "ボスガード", type: "Mechanic", description: "小さい利益ダメージを吸収します。大きな波、コンボ、読み切りボーナスで突破します。" },
+        { id: "chart", name: "相場読み", type: "Mechanic", description: "強気・弱気・中立から値動きを予想します。的中すると追加ダメージやドロー、防御を得ます。" },
         { id: "chart", name: "価格チャート", type: "Mechanic", description: "価格推移、前ターン比、評価損益を見てポジションを調整します。" },
         { id: "overheat", name: "過熱", type: "Mechanic", description: "上昇カードを重ねると溜まり、一定以上で反動売りが発生します。" }
       ]
@@ -2208,7 +2307,9 @@ function renderEffects() {
     { label: `暴落耐性 ${gameState.effects.crashGuards}`, active: gameState.effects.crashGuards > 0 },
     { label: `倍率 ${gameState.effects.upsideBoostCharges}`, active: gameState.effects.upsideBoostCharges > 0 },
     { label: `分岐 ${gameState.effects.marketChoiceCharges}`, active: gameState.effects.marketChoiceCharges > 0 },
+    { label: `板読み ${gameState.effects.readBoostCharges}`, active: gameState.effects.readBoostCharges > 0 },
     { label: `ブレイク ${gameState.effects.guardBreakCharges}`, active: gameState.effects.guardBreakCharges > 0 },
+    { label: `読み ${gameState.readStreak}HIT`, active: gameState.readStreak > 0 },
     { label: `ポジション ${positionRate}%`, active: positionRate > 70 },
     { label: `パッシブ ${gameState.passives.length}`, active: gameState.passives.length > 0 },
     { label: `レリック ${gameState.relics.length}${relicNames ? `: ${relicNames}` : ""}`, active: gameState.relics.length > 0 }
@@ -2346,6 +2447,10 @@ elements.buySharesButton.addEventListener("click", () => executeManualTrade("buy
 elements.sellSharesButton.addEventListener("click", () => executeManualTrade("sell"));
 elements.maxBuyButton.addEventListener("click", () => fillMaxShares("buy"));
 elements.maxSellButton.addEventListener("click", () => fillMaxShares("sell"));
+elements.readButtons.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-read]");
+  if (button) setMarketRead(button.dataset.read);
+});
 elements.tradeStockSelect.addEventListener("change", renderTradePanel);
 elements.tradeSharesInput.addEventListener("keydown", (event) => {
   if (event.key === "Enter") executeManualTrade("buy");

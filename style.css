@@ -599,7 +599,8 @@ button:disabled {
   gap: 8px;
 }
 
-.trade-buttons button {
+.trade-buttons button,
+.read-buttons button {
   min-height: 40px;
   border-radius: 0;
   padding: 0 12px;
@@ -622,6 +623,65 @@ button:disabled {
 .trade-hint {
   grid-column: 1 / -1;
   margin: 0;
+}
+
+.read-control {
+  display: grid;
+  gap: 8px;
+  border: 2px solid var(--line);
+  background: #071018;
+  padding: 10px;
+}
+
+.read-control-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.read-control-top span,
+.read-hint {
+  color: var(--yellow);
+  font-size: 12px;
+  font-weight: 800;
+  text-shadow: 2px 2px 0 #05070b;
+}
+
+.read-buttons {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.read-buttons button {
+  min-height: 34px;
+  border: 2px solid var(--line-bright);
+  background: #101a24;
+}
+
+.read-buttons button.selected {
+  color: var(--yellow);
+  border-color: var(--yellow);
+  background: #2a2209;
+}
+
+.read-buttons button[data-read="bull"].selected {
+  color: var(--green);
+  border-color: var(--green);
+  background: #0b2317;
+}
+
+.read-buttons button[data-read="bear"].selected {
+  color: var(--red);
+  border-color: var(--red);
+  background: #27090c;
+}
+
+.read-hint {
+  margin: 0;
+  color: #dce7d8;
+  line-height: 1.45;
 }
 
 .positive {

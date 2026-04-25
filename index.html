@@ -171,6 +171,18 @@
             <button id="buySharesButton" class="buy-button">買付</button>
             <button id="sellSharesButton" class="sell-button">売却</button>
           </div>
+          <div class="read-control">
+            <div class="read-control-top">
+              <span>相場読み</span>
+              <strong id="readStreakText">0 HIT</strong>
+            </div>
+            <div class="read-buttons" id="readButtons">
+              <button type="button" data-read="bull" data-tooltip-title="強気読み" data-tooltip-meta="Market Read" data-tooltip="ターン終了時に市場価格が5%以上上昇すると的中。追加ダメージを与えます。">強気</button>
+              <button type="button" data-read="bear" data-tooltip-title="弱気読み" data-tooltip-meta="Market Read" data-tooltip="ターン終了時に市場価格が5%以上下落すると的中。現金比率30%以上なら下落半減も得ます。">弱気</button>
+              <button type="button" data-read="neutral" data-tooltip-title="中立読み" data-tooltip-meta="Market Read" data-tooltip="ターン終了時の値動きが5%未満なら的中。追加ダメージは小さめですが次ターンのドローが増えます。">中立</button>
+            </div>
+            <p id="readHint" class="read-hint">値動きを予想して的中すると追加ダメージ。</p>
+          </div>
           <p id="tradeHint" class="trade-hint">ゲーム開始後、口数を指定していつでも売買できます。</p>
         </div>
       </section>
