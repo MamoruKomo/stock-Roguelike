@@ -499,54 +499,51 @@ const ROUTE_DEFINITIONS = {
   }
 };
 
-const ICON_INDEX = {
-  buy: 0,
-  takeProfit: 1,
-  averageDown: 2,
-  stopLoss: 3,
-  margin: 4,
-  goodEarnings: 5,
-  badEarnings: 6,
-  snsFire: 7,
-  policyTheme: 8,
-  rateHike: 9,
-  diversify: 10,
-  cashRatio: 11,
-  crashGuard: 12,
-  strongBuy: 13,
-  megaEarnings: 14,
-  ironGuard: 15,
-  diceRoll: 16,
-  jokerMultiplier: 17,
-  relicHunt: 18,
-  deckThin: 19,
-  marketBranch: 20,
-  tapeReading: 38,
-  curse: 21,
-  analysis: 22,
-  feeCut: 23,
-  diversifiedInvestor: 24,
-  contrarian: 25,
-  riskManagement: 26,
-  longTerm: 28,
-  gambler: 29,
-  compoundSeed: 30,
-  tradingTerminal: 31,
-  riskMeter: 32,
-  volatile: 33,
-  elite: 34,
-  safe: 35,
-  cursed: 36,
-  bossGuard: 37,
-  chart: 38,
-  overheat: 39,
-  guardBreak: 37,
-  taxShelter: 23,
-  energyCore: 31
+const ICON_FILES = {
+  buy: "buy.png",
+  takeProfit: "takeProfit.png",
+  averageDown: "averageDown.png",
+  stopLoss: "stopLoss.png",
+  margin: "margin.png",
+  goodEarnings: "goodEarnings.png",
+  badEarnings: "badEarnings.png",
+  snsFire: "snsFire.png",
+  policyTheme: "policyTheme.png",
+  rateHike: "rateHike.png",
+  diversify: "diversify.png",
+  cashRatio: "cashRatio.png",
+  crashGuard: "crashGuard.png",
+  strongBuy: "strongBuy.png",
+  megaEarnings: "megaEarnings.png",
+  ironGuard: "ironGuard.png",
+  diceRoll: "diceRoll.png",
+  jokerMultiplier: "jokerMultiplier.png",
+  relicHunt: "relicHunt.png",
+  deckThin: "deckThin.png",
+  marketBranch: "marketBranch.png",
+  tapeReading: "tapeReading.png",
+  curse: "curse.png",
+  analysis: "analysis.png",
+  feeCut: "feeCut.png",
+  diversifiedInvestor: "diversifiedInvestor.png",
+  contrarian: "contrarian.png",
+  riskManagement: "riskManagement.png",
+  longTerm: "longTerm.png",
+  gambler: "gambler.png",
+  compoundSeed: "compoundSeed.png",
+  tradingTerminal: "tradingTerminal.png",
+  riskMeter: "riskMeter.png",
+  volatile: "volatile.png",
+  elite: "elite.png",
+  safe: "safe.png",
+  cursed: "cursed.png",
+  bossGuard: "bossGuard.png",
+  chart: "chart.png",
+  overheat: "overheat.png",
+  guardBreak: "bossGuard.png",
+  taxShelter: "feeCut.png",
+  energyCore: "energyCore.png"
 };
-
-const ICON_COLUMNS = 8;
-const ICON_ROWS = 5;
 
 const gameState = {
   started: false,
@@ -2118,12 +2115,8 @@ function renderIcon(iconId, extraClass = "") {
 }
 
 function getIconStyle(iconId) {
-  const index = ICON_INDEX[iconId] ?? 0;
-  const column = index % ICON_COLUMNS;
-  const row = Math.floor(index / ICON_COLUMNS);
-  const x = ICON_COLUMNS === 1 ? 0 : (column / (ICON_COLUMNS - 1)) * 100;
-  const y = ICON_ROWS === 1 ? 0 : (row / (ICON_ROWS - 1)) * 100;
-  return `background-position: ${x.toFixed(4)}% ${y.toFixed(4)}%;`;
+  const fileName = ICON_FILES[iconId] || ICON_FILES.buy;
+  return `background-image: url("assets/icons/${fileName}");`;
 }
 
 function tooltipAttrs(title, description, meta = "") {

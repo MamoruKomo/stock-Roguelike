@@ -1057,8 +1057,8 @@ button:active,
   height: 42px;
   flex: 0 0 42px;
   border: 2px solid rgba(159, 176, 173, 0.82);
-  background-image: url("assets/compendium_icons.png");
-  background-size: 800% 500%;
+  background-size: cover;
+  background-position: center;
   background-repeat: no-repeat;
   background-color: #05070b;
   box-shadow: 0 0 0 2px #05070b;
