@@ -5,6 +5,7 @@ const STAGE_TURNS = 4;
 const MAX_TURNS = MAX_STAGES * STAGE_TURNS;
 const INITIAL_CASH = 1000000;
 const BASE_ENERGY = 3;
+const BASE_TRADE_TICKETS = 1;
 const TRANSACTION_FEE_RATE = 0.001;
 
 const STOCK_TEMPLATES = [
@@ -115,7 +116,7 @@ const PASSIVE_DEFINITIONS = {
   feeCut: {
     id: "feeCut",
     name: "手数料削減",
-    description: "売買時の手数料を50%削減する。"
+    description: "売買手数料が0になり、手動売買の行動力コストが0、毎ターンの売買枠が1増える。"
   },
   diversifiedInvestor: {
     id: "diversifiedInvestor",
@@ -150,7 +151,7 @@ const CARD_DEFINITIONS = {
     name: "押し目買いシグナル",
     rarity: "Common",
     category: "投資支援",
-    description: "市場価格を一時的に5%下落させる。常時売買で買い場を作るカード。",
+    description: "市場価格を一時的に5%下落させる。売買枠を使って買い場を作るカード。",
     target: "all",
     use(target) {
       applyPriceChanges({ [target]: -0.05 }, "押し目買いシグナル");
@@ -161,7 +162,7 @@ const CARD_DEFINITIONS = {
     name: "利確ブースト",
     rarity: "Common",
     category: "投資支援",
-    description: "保有中なら市場価格を8%上昇させる。売却判断は常時売買で行う。",
+    description: "保有中なら市場価格を8%上昇させる。売買枠を残していれば利確に使える。",
     target: "owned",
     use(target) {
       applyPriceChanges({ [target]: 0.08 }, "利確ブースト");
@@ -392,6 +393,20 @@ const CARD_DEFINITIONS = {
       addLog("分岐ルートを確保。次の市場イベントは2候補から有利な方を選びます。");
     }
   },
+  commissionFreeDay: {
+    id: "commissionFreeDay",
+    name: "手数料無料デー",
+    rarity: "Rare",
+    category: "取引",
+    description: "このターン、売買枠+1。手動売買の行動力コストと手数料が0になる。",
+    target: "none",
+    use() {
+      gameState.tradeTickets += 1;
+      gameState.maxTradeTickets += 1;
+      gameState.effects.freeTradeCharges += 1;
+      addLog("手数料無料デー: 売買枠+1。このターンの手動売買コストと手数料が0。");
+    }
+  },
   tapeReading: {
     id: "tapeReading",
     name: "板読み",
@@ -462,6 +477,7 @@ const REWARD_POOL = [
   "relicHunt",
   "deckThin",
   "marketBranch",
+  "commissionFreeDay",
   "tapeReading",
   "guardBreak"
 ];
@@ -521,6 +537,7 @@ const ICON_FILES = {
   relicHunt: "relicHunt.png",
   deckThin: "deckThin.png",
   marketBranch: "marketBranch.png",
+  commissionFreeDay: "feeCut.png",
   tapeReading: "tapeReading.png",
   curse: "curse.png",
   analysis: "analysis.png",
@@ -582,6 +599,8 @@ const gameState = {
   playedThisTurn: 0,
   energy: BASE_ENERGY,
   maxEnergy: BASE_ENERGY,
+  tradeTickets: BASE_TRADE_TICKETS,
+  maxTradeTickets: BASE_TRADE_TICKETS,
   nextDrawBonus: 0,
   effects: {
     margin: false,
@@ -590,6 +609,7 @@ const gameState = {
     upsideBoostCharges: 0,
     marketChoiceCharges: 0,
     readBoostCharges: 0,
+    freeTradeCharges: 0,
     guardBreakCharges: 0
   },
   relics: [],
@@ -699,6 +719,8 @@ function resetGame() {
   gameState.playedThisTurn = 0;
   gameState.energy = BASE_ENERGY;
   gameState.maxEnergy = BASE_ENERGY;
+  gameState.tradeTickets = BASE_TRADE_TICKETS;
+  gameState.maxTradeTickets = BASE_TRADE_TICKETS;
   gameState.nextDrawBonus = 0;
   gameState.marketRead = "neutral";
   gameState.readStreak = 0;
@@ -709,6 +731,7 @@ function resetGame() {
     upsideBoostCharges: 0,
     marketChoiceCharges: 0,
     readBoostCharges: 0,
+    freeTradeCharges: 0,
     guardBreakCharges: 0
   };
   gameState.relics = [];
@@ -735,9 +758,13 @@ function startTurn() {
   if (gameState.gameOver) return;
 
   gameState.playedThisTurn = 0;
+  gameState.bonusDamageThisTurn = 0;
   gameState.maxEnergy = getMaxEnergy();
   gameState.energy = gameState.maxEnergy;
+  gameState.maxTradeTickets = getMaxTradeTickets();
+  gameState.tradeTickets = gameState.maxTradeTickets;
   gameState.effects.margin = false;
+  gameState.effects.freeTradeCharges = 0;
   gameState.marketRead = "neutral";
   prepareStageTurnOmen();
   if (getCurrentRoute().freeHedge) {
@@ -752,7 +779,7 @@ function startTurn() {
   const drawCount = 3 + gameState.nextDrawBonus + relicDrawBonus + (getCurrentRoute().drawBonus || 0);
   gameState.nextDrawBonus = 0;
   drawCards(drawCount);
-  addLog(`<strong>Stage ${gameState.stageIndex + 1}-${gameState.stageTurn}</strong> 開始。手札を${drawCount}枚引き、行動力${gameState.energy}を得ました。`);
+  addLog(`<strong>Stage ${gameState.stageIndex + 1}-${gameState.stageTurn}</strong> 開始。手札${drawCount}枚 / 行動力${gameState.energy} / 売買枠${gameState.tradeTickets}。`);
   render();
 }
 
@@ -798,7 +825,6 @@ function useCard(instanceId, target) {
 function endTurn() {
   if (!gameState.started || gameState.gameOver || gameState.waitingForReward) return;
 
-  gameState.bonusDamageThisTurn = 0;
   gameState.discardPile.push(...gameState.hand);
   gameState.hand = [];
   setPreviousPrices();
@@ -1304,24 +1330,35 @@ function sellShares(symbol, sharesToSell, source = "売却") {
     stock.holdingTurns = 0;
   }
   gameState.cash += revenue;
+  if (hasRelic("taxShelter") && realizedProfit > 0) {
+    const taxAlpha = Math.min(Math.floor(realizedProfit * 0.18), 60000 + gameState.stageIndex * 30000);
+    addBonusDamage(taxAlpha, "節税口座");
+  }
   addLog(`${source}: ${sharesToSell}口売却。受取 ${formatYen(revenue)} / 手数料 ${formatYen(fee)} / 短期利確税 ${formatYen(profitTax)}。`);
   triggerImpact(`SELL ${stock.name}`, "trade");
   return true;
 }
 
 function calculateTradeFee(amount) {
-  const rate = (hasPassive("feeCut") ? TRANSACTION_FEE_RATE / 2 : TRANSACTION_FEE_RATE) * (getCurrentRoute().feeMultiplier || 1);
+  const rate = getTradeFeeRate();
   return Math.ceil(amount * rate);
 }
 
 function calculateMaxBuyShares(price) {
-  const rate = (hasPassive("feeCut") ? TRANSACTION_FEE_RATE / 2 : TRANSACTION_FEE_RATE) * (getCurrentRoute().feeMultiplier || 1);
+  const rate = getTradeFeeRate();
   return Math.floor(gameState.cash / (price * (1 + rate)));
 }
 
+function getTradeFeeRate() {
+  if (hasPassive("feeCut") || gameState.effects.freeTradeCharges > 0) return 0;
+  return TRANSACTION_FEE_RATE * (getCurrentRoute().feeMultiplier || 1);
+}
+
 function getProfitTaxRate() {
-  const baseRate = hasPassive("feeCut") ? 0.08 : 0.15;
-  return hasRelic("taxShelter") ? baseRate * 0.5 : baseRate;
+  let rate = 0.15;
+  if (hasPassive("feeCut")) rate -= 0.05;
+  if (hasRelic("taxShelter")) rate -= 0.12;
+  return Math.max(0, rate);
 }
 
 function improveAverageCost(symbol, improvementRate) {
@@ -1519,7 +1556,7 @@ const RELIC_DEFINITIONS = [
   {
     id: "taxShelter",
     name: "節税口座",
-    description: "短期利確税を半減する。細かい利確をビルドとして成立させやすくする。"
+    description: "短期利確税を大きく減らし、利益確定時に実現益の一部を追加ダメージに変える。"
   },
   {
     id: "energyCore",
@@ -1750,6 +1787,14 @@ function getMaxEnergy() {
   return BASE_ENERGY + (hasRelic("energyCore") ? 1 : 0);
 }
 
+function getMaxTradeTickets() {
+  return BASE_TRADE_TICKETS + (hasPassive("feeCut") ? 1 : 0);
+}
+
+function getTradeEnergyCost() {
+  return hasPassive("feeCut") || gameState.effects.freeTradeCharges > 0 ? 0 : 1;
+}
+
 function getCardCost(card) {
   if (Number.isFinite(card.cost)) return card.cost;
   if (card.rarity === "Epic") return 2;
@@ -1822,6 +1867,12 @@ function addLog(message) {
 
 function executeManualTrade(type) {
   if (!gameState.started || gameState.gameOver) return;
+  const tradeCost = getTradeEnergyCost();
+  if (gameState.waitingForReward || gameState.tradeTickets <= 0 || gameState.energy < tradeCost) {
+    addLog(`売買不可: 売買枠または行動力が不足しています。売買枠 ${gameState.tradeTickets}/${gameState.maxTradeTickets} / 行動力 ${gameState.energy}/${gameState.maxEnergy}`);
+    render();
+    return;
+  }
 
   const symbol = elements.tradeStockSelect.value;
   const shares = Math.floor(Number(elements.tradeSharesInput.value));
@@ -1835,6 +1886,11 @@ function executeManualTrade(type) {
     ? buyShares(symbol, shares, "手動買付")
     : sellShares(symbol, shares, "手動売却");
   if (succeeded) {
+    gameState.tradeTickets -= 1;
+    gameState.energy -= tradeCost;
+    if (hasPassive("feeCut")) {
+      addBonusDamage(12000 + gameState.stageIndex * 6000, "手数料削減");
+    }
     elements.tradeSharesInput.value = "";
   }
   checkGameEnd();
@@ -2017,21 +2073,22 @@ function renderTradePanel() {
   const disabled = !gameState.started || gameState.gameOver || !stock;
   const maxBuy = stock ? calculateMaxBuyShares(stock.price) : 0;
   const maxSell = stock ? stock.shares : 0;
+  const canTrade = !disabled && !gameState.waitingForReward && gameState.tradeTickets > 0 && gameState.energy >= getTradeEnergyCost();
 
-  elements.buySharesButton.disabled = disabled || maxBuy <= 0;
-  elements.sellSharesButton.disabled = disabled || maxSell <= 0;
-  elements.maxBuyButton.disabled = disabled || maxBuy <= 0;
-  elements.maxSellButton.disabled = disabled || maxSell <= 0;
-  elements.tradeSharesInput.disabled = disabled;
+  elements.buySharesButton.disabled = !canTrade || maxBuy <= 0;
+  elements.sellSharesButton.disabled = !canTrade || maxSell <= 0;
+  elements.maxBuyButton.disabled = !canTrade || maxBuy <= 0;
+  elements.maxSellButton.disabled = !canTrade || maxSell <= 0;
+  elements.tradeSharesInput.disabled = disabled || gameState.waitingForReward;
   elements.tradeStockSelect.disabled = disabled;
   renderMarketReadControls(disabled);
 
   if (!stock) {
-    elements.tradeHint.textContent = "ゲーム開始後、口数を指定していつでも売買できます。";
+    elements.tradeHint.textContent = "ゲーム開始後、売買枠と行動力を使って売買できます。";
     return;
   }
 
-  elements.tradeHint.textContent = `買付可能 ${maxBuy.toLocaleString("ja-JP")}口 / 売却可能 ${maxSell.toLocaleString("ja-JP")}口 / 平均取得 ${formatYen(stock.averageCost || 0)}`;
+  elements.tradeHint.textContent = `売買枠 ${gameState.tradeTickets}/${gameState.maxTradeTickets} / 売買コスト ${getTradeEnergyCost()} / 買付可能 ${maxBuy.toLocaleString("ja-JP")}口 / 売却可能 ${maxSell.toLocaleString("ja-JP")}口`;
 }
 
 function renderMarketReadControls(disabled) {
@@ -2307,6 +2364,7 @@ function renderEffects() {
     { label: `倍率 ${gameState.effects.upsideBoostCharges}`, active: gameState.effects.upsideBoostCharges > 0 },
     { label: `分岐 ${gameState.effects.marketChoiceCharges}`, active: gameState.effects.marketChoiceCharges > 0 },
     { label: `板読み ${gameState.effects.readBoostCharges}`, active: gameState.effects.readBoostCharges > 0 },
+    { label: "無料売買", active: gameState.effects.freeTradeCharges > 0 },
     { label: `ブレイク ${gameState.effects.guardBreakCharges}`, active: gameState.effects.guardBreakCharges > 0 },
     { label: `読み ${gameState.readStreak}HIT`, active: gameState.readStreak > 0 },
     { label: `ポジション ${positionRate}%`, active: positionRate > 70 },
