@@ -414,20 +414,68 @@ button:disabled {
   text-shadow: 2px 2px 0 #05070b;
 }
 
-.heat {
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 800;
-  white-space: nowrap;
+.heat-meter {
+  display: grid;
+  gap: 4px;
+  cursor: help;
+}
+
+.heat-label {
+  font-size: 14px;
+  font-weight: 900;
+  line-height: 1;
   text-shadow: 2px 2px 0 #05070b;
 }
 
-.heat.mid {
+.heat-bar {
+  display: grid;
+  grid-template-columns: repeat(9, 1fr);
+  gap: 2px;
+  width: min(150px, 100%);
+}
+
+.heat-bar i {
+  display: block;
+  height: 8px;
+  border: 1px solid rgba(159, 176, 173, 0.5);
+  background: #05070b;
+}
+
+.heat-bar i.on {
+  background: var(--green);
+  border-color: var(--green);
+}
+
+.heat-warning {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.heat-watch .heat-label,
+.heat-watch .heat-warning {
   color: var(--yellow);
 }
 
-.heat.high {
+.heat-watch .heat-bar i.on {
+  background: var(--yellow);
+  border-color: var(--yellow);
+}
+
+.heat-hot .heat-label,
+.heat-hot .heat-warning,
+.heat-danger .heat-label,
+.heat-danger .heat-warning {
   color: var(--red);
+}
+
+.heat-hot .heat-bar i.on,
+.heat-danger .heat-bar i.on {
+  background: var(--red);
+  border-color: var(--red);
+}
+
+.heat-danger {
   animation: impact-flash 520ms steps(2) infinite;
 }
 
@@ -1369,9 +1417,13 @@ body {
 }
 
 .status-grid {
-  grid-template-columns: 0.8fr 0.9fr 0.8fr 1.2fr 1.2fr 1.3fr;
+  grid-template-columns: 0.8fr 0.9fr 0.8fr 1.2fr 1.3fr;
   gap: 6px;
   margin-bottom: 8px;
+}
+
+.status-grid .metric:nth-child(5) {
+  display: none;
 }
 
 .metric {
@@ -1526,12 +1578,18 @@ body {
 }
 
 .price-strip {
-  grid-template-columns: 1.2fr 0.8fr 0.7fr;
+  grid-template-columns: 1.1fr 0.8fr 1fr;
   gap: 8px;
 }
 
 .position-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
+}
+
+.secondary-detail,
+.secondary-position {
+  display: none !important;
 }
 
 .price-main,

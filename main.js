@@ -2052,9 +2052,31 @@ function renderPriceChart() {
 
 function renderHeat(heat) {
   const level = Math.min(9, Math.max(0, heat || 0));
-  const className = level >= 6 ? "heat high" : level >= 3 ? "heat mid" : "heat";
-  const pips = level > 0 ? "■".repeat(Math.ceil(level / 2)) : "□";
-  return `<span class="${className}" title="過熱度: 高いほど反動売りが起きやすい">${pips} ${level}</span>`;
+  const zone = getHeatZone(level);
+  const warning = level >= 8 ? "反動 -24%" : level >= 6 ? "反動 -15%" : level >= 3 ? "注意" : "安全";
+  return `
+    <span class="heat-meter heat-${zone.key}" ${tooltipAttrs("過熱", getHeatDescription(level), "Market Risk")}>
+      <span class="heat-label">${zone.label}</span>
+      <span class="heat-bar" aria-hidden="true">
+        ${Array.from({ length: 9 }, (_, index) => `<i class="${index < level ? "on" : ""}"></i>`).join("")}
+      </span>
+      <span class="heat-warning">${warning}</span>
+    </span>
+  `;
+}
+
+function getHeatZone(level) {
+  if (level >= 8) return { key: "danger", label: "危険" };
+  if (level >= 6) return { key: "hot", label: "過熱" };
+  if (level >= 3) return { key: "watch", label: "注意" };
+  return { key: "safe", label: "安全" };
+}
+
+function getHeatDescription(level) {
+  if (level >= 8) return "ターン終了時に強い反動売りが起きやすい状態です。上昇カードの連打や追撃買いは危険です。";
+  if (level >= 6) return "ターン終了時に反動売りが発生する可能性があります。利確、防御、現金化を検討してください。";
+  if (level >= 3) return "上昇カードが続いています。さらに上げると反動売り圏に入ります。";
+  return "過熱は低い状態です。上昇カードを使っても反動売りは起きにくいです。";
 }
 
 function renderTradePanel() {
@@ -2088,7 +2110,7 @@ function renderTradePanel() {
     return;
   }
 
-  elements.tradeHint.textContent = `売買枠 ${gameState.tradeTickets}/${gameState.maxTradeTickets} / 売買コスト ${getTradeEnergyCost()} / 買付可能 ${maxBuy.toLocaleString("ja-JP")}口 / 売却可能 ${maxSell.toLocaleString("ja-JP")}口`;
+  elements.tradeHint.textContent = `売買枠 ${gameState.tradeTickets}/${gameState.maxTradeTickets} / コスト ${getTradeEnergyCost()} / 買 ${maxBuy.toLocaleString("ja-JP")} / 売 ${maxSell.toLocaleString("ja-JP")}`;
 }
 
 function renderMarketReadControls(disabled) {
@@ -2351,12 +2373,6 @@ function getLogToneClass(message) {
 }
 
 function renderEffects() {
-  const relicNames = gameState.relics
-    .map((relicId) => RELIC_DEFINITIONS.find((relic) => relic.id === relicId))
-    .filter(Boolean)
-    .map((relic) => relic.name)
-    .join(" / ");
-  const positionRate = Math.round(getLargestHoldingExposure() * 100);
   const badges = [
     { label: "信用取引", active: gameState.effects.margin },
     { label: `分散 ${gameState.effects.diversifyCharges}`, active: gameState.effects.diversifyCharges > 0 },
@@ -2366,10 +2382,7 @@ function renderEffects() {
     { label: `板読み ${gameState.effects.readBoostCharges}`, active: gameState.effects.readBoostCharges > 0 },
     { label: "無料売買", active: gameState.effects.freeTradeCharges > 0 },
     { label: `ブレイク ${gameState.effects.guardBreakCharges}`, active: gameState.effects.guardBreakCharges > 0 },
-    { label: `読み ${gameState.readStreak}HIT`, active: gameState.readStreak > 0 },
-    { label: `ポジション ${positionRate}%`, active: positionRate > 70 },
-    { label: `パッシブ ${gameState.passives.length}`, active: gameState.passives.length > 0 },
-    { label: `レリック ${gameState.relics.length}${relicNames ? `: ${relicNames}` : ""}`, active: gameState.relics.length > 0 }
+    { label: `読み ${gameState.readStreak}HIT`, active: gameState.readStreak > 0 }
   ].filter((badge) => badge.active);
 
   if (badges.length === 0) {
