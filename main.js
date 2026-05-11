@@ -482,6 +482,20 @@ const REWARD_POOL = [
   "guardBreak"
 ];
 
+const CARD_ATTACK_PRESSURE = {
+  takeProfit: 18000,
+  margin: 16000,
+  goodEarnings: 26000,
+  policyTheme: 42000,
+  strongBuy: 34000,
+  megaEarnings: 90000,
+  diceRoll: 12000,
+  jokerMultiplier: 18000,
+  commissionFreeDay: 12000,
+  tapeReading: 18000,
+  guardBreak: 26000
+};
+
 const ROUTE_DEFINITIONS = {
   volatile: {
     id: "volatile",
@@ -574,6 +588,7 @@ const gameState = {
   stageDamage: 0,
   lastDamage: 0,
   bonusDamageThisTurn: 0,
+  attackPressureThisTurn: 0,
   damageCombo: 0,
   lastOverkill: 0,
   bossHp: 0,
@@ -759,6 +774,7 @@ function startTurn() {
 
   gameState.playedThisTurn = 0;
   gameState.bonusDamageThisTurn = 0;
+  gameState.attackPressureThisTurn = 0;
   gameState.maxEnergy = getMaxEnergy();
   gameState.energy = gameState.maxEnergy;
   gameState.maxTradeTickets = getMaxTradeTickets();
@@ -807,6 +823,7 @@ function useCard(instanceId, target) {
 
   gameState.energy -= getCardCost(card);
   card.use(target);
+  addCardAttackPressure(card);
   gameState.hand.splice(handIndex, 1);
   if (card.exhaustOnUse) {
     removeCardInstanceFromDeck(cardInstance.instanceId);
@@ -877,6 +894,7 @@ function setupStage(stageIndex) {
   gameState.stageDamage = 0;
   gameState.lastDamage = 0;
   gameState.bonusDamageThisTurn = 0;
+  gameState.attackPressureThisTurn = 0;
   gameState.damageCombo = 0;
   gameState.lastOverkill = 0;
   gameState.bossHp = Math.floor(stage.hp * (route.hpMultiplier || 1));
@@ -1099,6 +1117,19 @@ function addBonusDamage(amount, label) {
   triggerImpact(`${label} +${formatYen(damage)}`, "bonus");
 }
 
+function addCardAttackPressure(card) {
+  const basePressure = CARD_ATTACK_PRESSURE[card.id] || 0;
+  if (basePressure <= 0) return;
+
+  const stageScale = 1 + gameState.stageIndex * 0.28;
+  let pressure = Math.floor(basePressure * stageScale);
+  if (card.rarity === "Epic" && gameState.stageTurn === STAGE_TURNS) {
+    pressure = Math.floor(pressure * 1.15);
+  }
+  gameState.attackPressureThisTurn += pressure;
+  addLog(`攻勢: <strong>${card.name}</strong> が ${formatYen(pressure)} の直接圧力を作りました。`);
+}
+
 function scaleChanges(changes, multiplier) {
   return Object.fromEntries(
     Object.entries(changes).map(([symbol, percent]) => [symbol, percent * multiplier])
@@ -1156,15 +1187,17 @@ function resolveBossDamage() {
   const gain = total - gameState.lastTurnAssets;
   const baseDamage = Math.max(0, Math.floor(gain));
   const bonusDamage = gameState.bonusDamageThisTurn;
-  if (baseDamage > 0 || bonusDamage > 0) {
+  const attackPressure = gameState.attackPressureThisTurn;
+  if (baseDamage > 0 || bonusDamage > 0 || attackPressure > 0) {
     gameState.damageCombo += 1;
     const multiplier = getDamageComboMultiplier();
     const concentrationRate = getLargestHoldingExposure();
     const concentrationPenalty = gameState.stageIndex >= 1 && concentrationRate > 0.7 ? 0.75 : 1;
-    const rawDamage = Math.floor(baseDamage * multiplier) + bonusDamage;
+    const dampedBaseDamage = applyAssetDamageResistance(baseDamage);
+    const rawDamage = Math.floor(dampedBaseDamage * multiplier) + bonusDamage;
     const guard = getEffectiveBossGuard();
     const guardedDamage = Math.max(0, rawDamage - guard);
-    const damage = Math.floor(guardedDamage * concentrationPenalty);
+    const damage = Math.floor(guardedDamage * concentrationPenalty) + attackPressure;
     const hpBefore = gameState.bossHp;
     gameState.bossHp = Math.max(0, gameState.bossHp - damage);
     gameState.lastDamage = damage;
@@ -1173,6 +1206,9 @@ function resolveBossDamage() {
     if (concentrationPenalty < 1) {
       addLog("ポジション過大: 総資産の70%超を建てているため、ボスへのダメージ効率が25%低下。");
     }
+    if (dampedBaseDamage < baseDamage) {
+      addLog(`ボス耐性: 複利で膨らんだ利益 ${formatYen(baseDamage)} を ${formatYen(dampedBaseDamage)} に圧縮。攻め札の攻勢は圧縮されません。`);
+    }
     if (rawDamage > 0 && guardedDamage <= 0) {
       addLog(`ボスガード: 小さい利益 ${formatYen(rawDamage)} はガード ${formatYen(guard)} に吸収されました。`);
     }
@@ -1180,7 +1216,7 @@ function resolveBossDamage() {
       gameState.effects.guardBreakCharges -= 1;
       addLog(`ガードブレイク発動: ボスガードを ${formatYen(getBossGuard())} → ${formatYen(guard)} に低下。`);
     }
-    addLog(`利益 ${formatYen(baseDamage)} × COMBO ${multiplier.toFixed(2)} + 読み切り ${formatYen(bonusDamage)} - ガード ${formatYen(guard)} = <strong>${formatYen(damage)}</strong> ダメージ。残HP ${formatYen(gameState.bossHp)}。`);
+    addLog(`利益 ${formatYen(dampedBaseDamage)} × COMBO ${multiplier.toFixed(2)} + 読み切り ${formatYen(bonusDamage)} - ガード ${formatYen(guard)} + 攻勢 ${formatYen(attackPressure)} = <strong>${formatYen(damage)}</strong> ダメージ。残HP ${formatYen(gameState.bossHp)}。`);
     triggerImpact(damage > 0 ? `${formatYen(damage)} DAMAGE` : "GUARDED", damage > 0 ? "damage" : "miss");
     pulseElement(elements.bossHpFill, "hit");
   } else {
@@ -1191,6 +1227,18 @@ function resolveBossDamage() {
     triggerImpact("NO DAMAGE", "miss");
   }
   gameState.lastTurnAssets = total;
+}
+
+function applyAssetDamageResistance(baseDamage) {
+  if (baseDamage <= 0) return 0;
+  const softCap = getAssetDamageSoftCap();
+  if (baseDamage <= softCap) return baseDamage;
+  return softCap + Math.floor((baseDamage - softCap) * 0.25);
+}
+
+function getAssetDamageSoftCap() {
+  const stagePressure = 0.42 + gameState.stageIndex * 0.035;
+  return Math.floor(gameState.bossMaxHp * stagePressure);
 }
 
 function getDamageComboMultiplier() {
@@ -2264,6 +2312,8 @@ function renderCompendium() {
       title: "重要システム",
       entries: [
         { id: "bossGuard", name: "ボスガード", type: "Mechanic", description: "小さい利益ダメージを吸収します。大きな波、コンボ、読み切りボーナスで突破します。" },
+        { id: "guardBreak", name: "攻勢", type: "Mechanic", description: "攻め札を切ると発生する直接ダメージです。資産が増えすぎた時のボス耐性やガードに潰されにくく、攻めるほど突破力が上がります。" },
+        { id: "bossGuard", name: "ボス耐性", type: "Mechanic", description: "大きく育った資産だけでボスを押し切ると、利益ダメージが圧縮されます。攻勢、読み切り、相場読みで突破します。" },
         { id: "chart", name: "相場読み", type: "Mechanic", description: "強気・弱気・中立から値動きを予想します。的中すると追加ダメージやドロー、防御を得ます。" },
         { id: "chart", name: "価格チャート", type: "Mechanic", description: "価格推移、前ターン比、評価損益を見てポジションを調整します。" },
         { id: "overheat", name: "過熱", type: "Mechanic", description: "上昇カードを重ねると溜まり、一定以上で反動売りが発生します。" }
@@ -2382,6 +2432,7 @@ function renderEffects() {
     { label: `板読み ${gameState.effects.readBoostCharges}`, active: gameState.effects.readBoostCharges > 0 },
     { label: "無料売買", active: gameState.effects.freeTradeCharges > 0 },
     { label: `ブレイク ${gameState.effects.guardBreakCharges}`, active: gameState.effects.guardBreakCharges > 0 },
+    { label: `攻勢 ${formatYen(gameState.attackPressureThisTurn)}`, active: gameState.attackPressureThisTurn > 0 },
     { label: `読み ${gameState.readStreak}HIT`, active: gameState.readStreak > 0 }
   ].filter((badge) => badge.active);
 
