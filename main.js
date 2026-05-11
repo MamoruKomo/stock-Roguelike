@@ -2195,7 +2195,7 @@ function renderIcon(iconId, extraClass = "") {
 
 function getIconStyle(iconId) {
   const fileName = ICON_FILES[iconId] || ICON_FILES.buy;
-  return `background-image: url("assets/icons/${fileName}");`;
+  return `background-image: url(assets/icons/${fileName});`;
 }
 
 function tooltipAttrs(title, description, meta = "") {
